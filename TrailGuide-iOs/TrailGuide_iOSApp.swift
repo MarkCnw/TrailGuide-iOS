@@ -1,8 +1,8 @@
 //
 //  ContentView.swift
-//  TrailGuide-iOs
+//  TrailGuide
 //
-//  Created by MarkCnw on 11/4/2569 BE.
+//  Created by MarkCnw on 9/4/2569 BE.
 //
 
 import SwiftUI
@@ -19,6 +19,4 @@ struct ContentView: View {
     }
 }
 
-#Preview {
-    ContentView()
-}
+
