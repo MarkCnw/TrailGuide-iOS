@@ -43,7 +43,7 @@ struct ProfileSettingsView: View {
                         
                         // --- ส่วนข้อความ ---
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("สวัสดีนักเดินทาง")
+                            Text("สวัสดีนักเดินทางง")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                             
