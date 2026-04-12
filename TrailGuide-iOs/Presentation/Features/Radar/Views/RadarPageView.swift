@@ -1,141 +1,148 @@
 import SwiftUI
 
 struct RadarPageView: View {
+    @State private var viewModel: RadarViewModel
     
-    @State private var userProfile: UserProfileEntity?
-    var userRepository: UserRepositoryProtocol?
+    // 🟢 ประกาศตัวแปรรับ RoomViewModel โดยยังไม่ใส่ค่าเริ่มต้นตรงนี้
+    @StateObject private var roomViewModel: RoomViewModel
+    
+    // ตัวแปรควบคุมการเปิดหน้าจอ
+    @State private var navigateToLobby: Bool = false
+    @State private var showScanSheet: Bool = false
+    @State private var showLobby = false
+    @State private var showScan = false
+    
+    init(userRepository: UserRepositoryProtocol?) {
+        _viewModel = State(initialValue: RadarViewModel(userRepository: userRepository))
+        // 🟢 เอา userRepository ที่ได้รับมาตอนเปิดหน้า โยนเข้าไปสร้าง RoomViewModel
+        _roomViewModel = StateObject(wrappedValue: RoomViewModel(userRepository: userRepository!))
+    }
     
     var body: some View {
-        ZStack {
-            // สีพื้นหลังตามระบบ
-            Color(.systemGroupedBackground).ignoresSafeArea()
-            
-            VStack {
+        NavigationStack {
+            ZStack {
+                Color(.systemGroupedBackground).ignoresSafeArea()
                 
-                // 🟢 เพิ่มหัวข้อ "เรดาร์หาเพื่อน" บนสุด ชิดซ้าย
-                HStack {
-                                    Text("เรดาร์หาเพื่อนนน")
-                                        .font(.largeTitle) // ทำให้ตัวหนังสือใหญ่เหมือนหน้าหลักของแอป iOS
-                                        .fontWeight(.heavy)
-                                        .foregroundColor(.primary)
-                                    
-                                    Spacer() // ดันข้อความไปชิดซ้าย
-                                }
-                                .padding(.top, 20)
-                                .padding(.horizontal, 24)
-                // ==========================================
-                // 🟢 1. ส่วนบน: โชว์รูปและชื่อมุมซ้ายบน
-                // ==========================================
-                HStack(spacing: 16) {
-                    if let profile = userProfile {
-                        
-                        // --- ส่วนรูปภาพ ---
-                        if let imagePath = profile.imagePath,
-                           let uiImage = UIImage(contentsOfFile: imagePath) {
-                            
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 80, height: 80)
-                                .clipShape(Circle())
-                                .overlay(Circle().stroke(Color.blue, lineWidth: 2))
-                            
-                        } else {
-                            // ถ้าไม่มีรูปโชว์ตัวอักษรย่อ
-                            Circle()
-                                .fill(Color.blue.opacity(0.1))
-                                .frame(width: 80, height: 80)
-                                .overlay(Circle().stroke(Color.blue.opacity(0.5), lineWidth: 2))
-                                .overlay(
-                                    Text(String(profile.username.prefix(1)).uppercased())
-                                        .font(.system(size: 32, weight: .bold))
-                                        .foregroundColor(.blue)
-                                )
-                        }
-                        
-                        // --- ส่วนข้อความ ---
+                VStack(alignment: .leading, spacing: 32) {
+                    
+                    // --- 1. Header (ชื่อและรูปโปรไฟล์ระนาบเดียวกัน) ---
+                    HStack(alignment: .center) {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("สวัสดีนักเดินทาง")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary) // สีเทาอ่อนๆ ให้ดูสบายตา
-                            
-                            Text(profile.username)
-                                .font(.title2)
-                                .fontWeight(.bold)
+                            Text("เรดาร์ติดตามเพื่อน")
+                                .font(.system(.title, design: .rounded))
+                                .fontWeight(.heavy)
                                 .foregroundColor(.primary)
+                            
+                            Text("เลือกบทบาทของคุณเพื่อเริ่มต้น")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
                         }
-                        
-                    } else {
-                        // โชว์ตอนรอโหลดข้อมูล
-                        Text("Loading...")
-                            .foregroundColor(.gray)
-                    }
-                    
-                    Spacer() // 🟢 ดันทุกอย่างให้ไปชิดซ้ายสุด
-                }
-                .padding(.top, 5)
-                .padding(.horizontal, 24)
-                
-                Spacer() // 🟢 ดันก้อนรูปและชื่อขึ้นไปติดขอบบนสุด
-                
-                // ==========================================
-                // 🟢 2. ส่วนล่าง: ปุ่มเลือกบทบาท Host / Member
-                // ==========================================
-                VStack(spacing: 20) {
-                    Text("เลือกบทบาทการเดินทางของคุณ")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                    
-                    HStack(spacing: 16) {
-                        // ปุ่ม Host
-                        Button(action: {
-                            print("👉 เลือกเป็น Host")
-                        }) {
-                            VStack(spacing: 12) {
-                                Image(systemName: "antenna.radiowaves.left.and.right")
-                                    .font(.system(size: 32))
-                                Text("ตั้งกลุ่ม (Host)")
-                                    .font(.headline)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 20)
-                            .background(Color.blue.opacity(0.1))
-                            .foregroundColor(.blue)
-                            .cornerRadius(16)
-                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.blue.opacity(0.3), lineWidth: 1))
-                        }
-                        
-                        // ปุ่ม Member
-                        Button(action: {
-                            print("👉 เลือกเป็น Member")
-                        }) {
-                            VStack(spacing: 12) {
-                                Image(systemName: "person.2.fill")
-                                    .font(.system(size: 32))
-                                Text("เข้าร่วม (Member)")
-                                    .font(.headline)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 20)
-                            .background(Color.green.opacity(0.1))
-                            .foregroundColor(.green)
-                            .cornerRadius(16)
-                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.green.opacity(0.3), lineWidth: 1))
-                        }
+                        Spacer()
+                        miniProfileView
                     }
                     .padding(.horizontal, 24)
+                    .padding(.top, 20)
+                    
+                    // --- 2. Role Selection (แนวนอน 2 ปุ่มติดกัน) ---
+                    HStack(spacing: 16) {
+                        roleButton(
+                            title: "ตั้งกลุ่ม\n(Host)",
+                            subtitle: "สร้างวงเรดาร์ให้ทีม",
+                            icon: "antenna.radiowaves.left.and.right",
+                            isPrimary: true,
+                            action: { navigateToLobby = true }
+                        )
+                        
+                        roleButton(
+                            title: "เข้าร่วม\n(Member)",
+                            subtitle: "สแกนหาเพื่อนในทีม",
+                            icon: "location.viewfinder",
+                            isPrimary: false,
+                            action: { showScanSheet = true }
+                        )
+                    }
+                    .padding(.horizontal, 24)
+                    
+                    Spacer()
                 }
-                .padding(.bottom, 40)
+            }
+            .navigationBarHidden(true)
+            .task {
+                await viewModel.loadUserData()
+            }
+            // --- 3. ระบบเชื่อมต่อหน้าจอ (Navigation & Sheet) ---
+            .navigationDestination(isPresented: $navigateToLobby) {
+                // 🟢 เปลี่ยนมาส่ง roomViewModel ให้หน้า LobbyView แทน
+                LobbyView(viewModel: roomViewModel)
+            }
+            .sheet(isPresented: $showScanSheet) {
+                // 🟢 เปลี่ยนมาส่ง roomViewModel ให้หน้า ScanView แทน
+                ScanView(viewModel: roomViewModel)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
             }
         }
-        .task {
-            if let repo = userRepository {
-                do {
-                    self.userProfile = try await repo.getUserProfile()
-                } catch {
-                    print("❌ Error fetching profile: \(error)")
-                }
+    }
+    
+    private var miniProfileView: some View {
+        Group {
+            if let uiImage = viewModel.profileImage {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 55, height: 55)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Color.green.opacity(0.4), lineWidth: 1.5))
+            } else {
+                Circle()
+                    .fill(Color.green.opacity(0.15))
+                    .frame(width: 55, height: 55)
+                    .overlay(
+                        Text(String(viewModel.username.prefix(1)).uppercased())
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.green)
+                    )
             }
         }
+    }
+    
+    private func roleButton(title: String, subtitle: String, icon: String, isPrimary: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(isPrimary ? Color.green : Color.green.opacity(0.15))
+                        .frame(width: 50, height: 50)
+                    
+                    Image(systemName: icon)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(isPrimary ? .white : .green)
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, maxHeight: 180, alignment: .topLeading)
+            .background(Color(.systemBackground))
+            .cornerRadius(20)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(isPrimary ? Color.green.opacity(0.4) : Color.green.opacity(0.15), lineWidth: 1.5)
+            )
+            .shadow(color: Color.green.opacity(isPrimary ? 0.15 : 0.05), radius: 10, x: 0, y: 4)
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }

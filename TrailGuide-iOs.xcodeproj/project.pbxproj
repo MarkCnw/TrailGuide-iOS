@@ -10,9 +10,22 @@
 		F24FB9712F8A4AC6006B2E4F /* TrailGuide-iOs.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "TrailGuide-iOs.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		F2E2F1FA2F8B98CE007D20F7 /* Exceptions for "TrailGuide-iOs" folder in "TrailGuide-iOs" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = F24FB9702F8A4AC6006B2E4F /* TrailGuide-iOs */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		F24FB9732F8A4AC6006B2E4F /* TrailGuide-iOs */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				F2E2F1FA2F8B98CE007D20F7 /* Exceptions for "TrailGuide-iOs" folder in "TrailGuide-iOs" target */,
+			);
 			path = "TrailGuide-iOs";
 			sourceTree = "<group>";
 		};
@@ -256,11 +269,14 @@
 				DEVELOPMENT_TEAM = HJ24GQ285H;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "TrailGuide-iOs/Info.plist";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "TrailGuide ต้องการใช้ Local Network และ Bluetooth เพื่อค้นหาเพื่อนนักเดินทางรอบตัวคุณ";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -288,11 +304,14 @@
 				DEVELOPMENT_TEAM = HJ24GQ285H;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "TrailGuide-iOs/Info.plist";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "TrailGuide ต้องการใช้ Local Network และ Bluetooth เพื่อค้นหาเพื่อนนักเดินทางรอบตัวคุณ";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

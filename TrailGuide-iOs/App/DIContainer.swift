@@ -16,5 +16,5 @@ func makeRadarViewModel() -> RadarViewModel {
     let useCase = GetUserProfileUseCase(userRepository: repo)
     
     // 3. สร้าง ViewModel แล้วฉีด Use Case เข้าไป
-    return RadarViewModel(getUserProfileUseCase: useCase)
+    return RadarViewModel(userRepository: userRepository)
 }

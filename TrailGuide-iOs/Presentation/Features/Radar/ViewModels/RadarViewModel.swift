@@ -1,4 +1,3 @@
-
 import SwiftUI
 import Observation
 
@@ -6,28 +5,28 @@ import Observation
 final class RadarViewModel {
     var username: String = "กำลังโหลด..."
     var profileImage: UIImage? = nil
-    var members: [Peer] = []
     
-    // ประกาศเรียกใช้ UseCase
-    private let getUserProfileUseCase: GetUserProfileUseCase
+    // 🟢 แก้ให้รับ UserRepository เพื่อให้ตรงกับที่ส่งมาจาก MainTabView
+     let userRepository: UserRepositoryProtocol?
     
-    init(getUserProfileUseCase: GetUserProfileUseCase) {
-        self.getUserProfileUseCase = getUserProfileUseCase
+    init(userRepository: UserRepositoryProtocol?) {
+        self.userRepository = userRepository
     }
     
     @MainActor
     func loadUserData() async {
+        guard let repo = userRepository else { return }
         do {
-            // ไปดึงข้อมูลจาก Local Database
-            if let profile = try await getUserProfileUseCase.execute() {
+            if let profile = try await repo.getUserProfile() {
                 self.username = profile.username
                 
-                // ถ้าระบบบอกว่ามีที่อยู่ไฟล์รูปภาพ ก็ไปหยิบรูปมาแสดง
-                if let path = profile.imagePath {
-                    self.profileImage = UIImage(contentsOfFile: path)
+                // 🟢 ประกอบ Path รูปภาพใหม่แบบเดียวกับหน้า Setting
+                if let fileName = profile.imagePath,
+                   let documentDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                    let fileURL = documentDirectory.appendingPathComponent(fileName)
+                    self.profileImage = UIImage(contentsOfFile: fileURL.path)
                 }
             } else {
-                // กรณี Database ว่างเปล่า
                 self.username = "นักเดินทางลึกลับ"
             }
         } catch {
