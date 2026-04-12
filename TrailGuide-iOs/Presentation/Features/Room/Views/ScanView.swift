@@ -1,67 +1,37 @@
 import SwiftUI
 import MultipeerConnectivity
 
-
-
 struct ScanView: View {
-    @StateObject var viewModel: RoomViewModel
+    @ObservedObject var viewModel: RoomViewModel
     @Environment(\.dismiss) var dismiss
-    
+    @State private var navigateToLobby = false
+    @State private var isWaitingForHost = false
+
     var body: some View {
         NavigationStack {
-            VStack {
-                // ส่วนของเรดาร์จำลอง
-                ZStack {
-                    Circle()
-                        .stroke(Color.green.opacity(0.2), lineWidth: 1)
-                        .frame(width: 200, height: 200)
-                    
-                    Circle()
-                        .stroke(Color.green.opacity(0.3), lineWidth: 1)
-                        .frame(width: 150, height: 150)
-                    
-                    Image(systemName: "location.magnifyingglass")
-                        .font(.system(size: 40))
-                        .foregroundColor(.green)
+            List {
+                // --- ส่วนเรดาร์ ---
+                Section {
+                    radarHeaderView
                 }
-                .padding(.top, 40)
-                
-                Text("กำลังค้นหาหัวหน้าทริป...")
-                    .font(.headline)
-                    .padding(.top, 20)
-                
-                // ลิสต์รายชื่อ Host ที่สแกนเจอ
-                List {
+                .listRowBackground(Color.clear)
+
+                // --- รายชื่อ Host ---
+                if !isWaitingForHost {
                     Section(header: Text("กลุ่มที่พบใกล้ตัว")) {
                         if viewModel.sessionManager.availablePeers.isEmpty {
                             HStack {
-                                Spacer()
                                 ProgressView()
-                                Text(" ค้นหาอยู่...")
-                                    .foregroundColor(.gray)
-                                Spacer()
+                                    .padding(.trailing, 8)
+                                Text("ค้นหาอยู่...")
+                                    .foregroundColor(.secondary)
                             }
-                            .listRowBackground(Color.clear)
                         } else {
                             ForEach(viewModel.sessionManager.availablePeers, id: \.self) { peer in
-                                Button(action: {
+                                PeerRowView(peer: peer) {
                                     viewModel.join(peer: peer)
-                                }) {
-                                    HStack {
-                                        VStack(alignment: .leading) {
-                                            Text(peer.displayName)
-                                                .fontWeight(.bold)
-                                            Text("กดเพื่อขอเข้าร่วมกลุ่ม")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .font(.caption)
-                                            .foregroundColor(.gray)
-                                    }
+                                    isWaitingForHost = true
                                 }
-                                .foregroundColor(.primary)
                             }
                         }
                     }
@@ -78,17 +48,86 @@ struct ScanView: View {
                 }
             }
             .onAppear {
-                viewModel.startBrowsing() // 🟢 เริ่มสแกนทันทีที่เปิดหน้า
+                viewModel.startBrowsing()
             }
             .onDisappear {
-                viewModel.stopBrowsing() // 🔴 หยุดสแกนเมื่อปิดหน้า
-            }
-            // เมื่อเชื่อมต่อสำเร็จ ให้เด้งไปหน้า Lobby (ถ้าต้องการ) หรือจัดการสถานะต่อ
-            .onChange(of: viewModel.sessionManager.connectedPeers) { oldValue, newValue in
-                if !newValue.isEmpty {
-                    // เชื่อมต่อติดแล้ว! (ในที่นี้เราอาจจะจัดการผ่าน State เพื่อเปลี่ยน View)
+                if !navigateToLobby {
+                    viewModel.stopBrowsing()
                 }
             }
+            .onChange(of: viewModel.sessionManager.connectedPeers) { _, newValue in
+                if !newValue.isEmpty {
+                    navigateToLobby = true
+                }
+            }
+            .navigationDestination(isPresented: $navigateToLobby) {
+                MemberLobbyView(viewModel: viewModel)
+            }
+        }
+    }
+
+    // --- Subviews ---
+    private var radarHeaderView: some View {
+        VStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .stroke(Color.green.opacity(0.15), lineWidth: 1)
+                    .frame(width: 160, height: 160)
+                Circle()
+                    .stroke(Color.green.opacity(0.25), lineWidth: 1)
+                    .frame(width: 110, height: 110)
+                Circle()
+                    .stroke(Color.green.opacity(0.4), lineWidth: 1)
+                    .frame(width: 60, height: 60)
+                Image(systemName: isWaitingForHost ? "clock.arrow.circlepath" : "location.magnifyingglass")
+                    .font(.system(size: 28))
+                    .foregroundColor(.green)
+                    .symbolEffect(.variableColor.iterative, options: .repeating)
+            }
+            .padding(.top, 8)
+
+            Text(isWaitingForHost ? "รอหัวหน้าทริปยืนยัน..." : "กำลังค้นหากลุ่มใกล้เคียง")
+                .font(.headline)
+
+            Text(isWaitingForHost ? "หัวหน้าทริปกำลังพิจารณาคำขอของคุณ" : "กลุ่มที่เปิดรับสมาชิกจะปรากฏด้านล่าง")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+    }
+}
+
+private struct PeerRowView: View {
+    let peer: MCPeerID
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.green.opacity(0.15))
+                        .frame(width: 36, height: 36)
+                    Text(String(peer.displayName.prefix(1)).uppercased())
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.green)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(peer.displayName)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+                    Text("กดเพื่อขอเข้าร่วม")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.black)
+            }
+            .padding(.vertical, 4)
         }
     }
 }

@@ -60,6 +60,7 @@ final class ProfileSetupViewModel {
             do {
                 try await repo.saveUserProfile(profile: newProfile)
                 UserDefaults.standard.set(true, forKey: "hasProfile")
+                UserDefaults.standard.set(self.username, forKey: "username") // ✅ เพิ่มบรรทัดนี้
             } catch {
                 print("❌ เซฟข้อมูลไม่สำเร็จ: \(error)")
             }
