@@ -1,18 +1,24 @@
 import SwiftUI
-import SwiftData // 🟢 1. อย่าลืมอิมพอร์ต
+import SwiftData // 🟢 1. อิมพอร์ตถูกต้องแล้ว
 
 @main
 struct TrailGuideApp: App {
     @AppStorage("hasProfile") private var hasProfile: Bool = false
+    @AppStorage("appTheme") private var appTheme: String = "system"
     
     var body: some Scene {
         WindowGroup {
-            if hasProfile {
-                MainTabView()
-            } else {
-                ProfileSetupView()
+            // 🟢 เอา Group มาครอบ View ภายในไว้
+            Group {
+                if hasProfile {
+                    MainTabView()
+                } else {
+                    ProfileSetupView()
+                }
             }
+            // 🟢 ย้ายคำสั่งมาแปะติดกับ Group แทน
+            .preferredColorScheme(appTheme == "light" ? .light : (appTheme == "dark" ? .dark : nil))
+            .modelContainer(for: UserProfileSchema.self)
         }
-        .modelContainer(for: UserProfileSchema.self) // 🟢 2. แปะคำสั่งนี้เพื่อเปิดใช้ฐานข้อมูล
     }
 }

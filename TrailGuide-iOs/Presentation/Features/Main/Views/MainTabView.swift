@@ -3,18 +3,16 @@ import SwiftData
 
 struct MainTabView: View {
     @State private var selectedTab = 0
-    @Environment(\.modelContext) private var modelContext // 🟢 2. ดึงฐานข้อมูลของแอปมา
+    @Environment(\.modelContext) private var modelContext
     
     var body: some View {
         TabView(selection: $selectedTab) {
             
-            // Tab 1: เรดาร์ (หน้าหลักที่คุณทำไว้)
+            // Tab 1: เรดาร์
             NavigationStack {
-                            // 🟢 3. ประกอบร่าง Repository แล้วส่งให้หน้า Radar
-                            RadarPageView(userRepository: UserRepositoryImpl(modelContext: modelContext))
-                        }
-                        .tabItem { Label("เรดาร์", systemImage: "antenna.radiowaves.left.and.right") }
-                        .tag(0)
+                RadarPageView(userRepository: UserRepositoryImpl(modelContext: modelContext))
+            }
+            // 🟢 แก้บัค 1: ลบ tabItem ที่ซ้ำซ้อนออก เหลือแค่อันเดียว
             .tabItem {
                 Label("เรดาร์", systemImage: "antenna.radiowaves.left.and.right")
             }
@@ -22,7 +20,7 @@ struct MainTabView: View {
             
             // Tab 2: ประวัติการเดินทาง
             NavigationStack {
-                HistoryView() // หน้าประวัติ (รอคุณสร้าง)
+                HistoryView()
                     .navigationTitle("ประวัติเดินป่า")
             }
             .tabItem {
@@ -31,15 +29,16 @@ struct MainTabView: View {
             .tag(1)
             
             // Tab 3: ตั้งค่า/โปรไฟล์
-            NavigationStack {
-                ProfileSettingsView() // หน้าตั้งค่า
-                    .navigationTitle("โปรไฟล์")
-            }
-            .tabItem {
-                Label("โปรไฟล์", systemImage: "person.crop.circle")
-            }
-            .tag(2)
+                        NavigationStack {
+                            // 🟢 แก้ไข: ส่ง userRepository เข้าไปด้วย
+                            ProfileSettingsView(userRepository: UserRepositoryImpl(modelContext: modelContext))
+                                .navigationTitle("โปรไฟล์")
+                        }
+                        .tabItem {
+                            Label("โปรไฟล์", systemImage: "person.crop.circle")
+                        }
+                        .tag(2)
         }
-        .accentColor(.blue) // สีของไอคอนที่เลือก
+        .accentColor(.blue)
     }
 }
