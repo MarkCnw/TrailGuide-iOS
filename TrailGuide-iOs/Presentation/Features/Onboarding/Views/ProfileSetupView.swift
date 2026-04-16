@@ -3,101 +3,137 @@ import PhotosUI
 import SwiftData
 
 struct ProfileSetupView: View {
-    // ผูก ViewModel เข้ากับ View
     @State private var viewModel = ProfileSetupViewModel()
-    @Environment(\.modelContext) private var modelContext // 🟢 1. เพิ่มบรรทัดนี้
+    @Environment(\.modelContext) private var modelContext
+    
+    // 🟢 HIG: ใช้ FocusState เพื่อจัดการ Keyboard
+    @FocusState private var isTextFieldFocused: Bool
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 32) {
-                
-                // 1. ส่วนหัว (Header)
-                Text("สร้างโปรไฟล์นักเดินทาง")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .padding(.top, 40)
-                
-                // 2. ส่วนเลือกรูปโปรไฟล์ (ไม่บังคับ)
-                profileImagePickerSection
-                
-                // 3. ส่วนกรอกชื่อผู้ใช้ (บังคับ)
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("ชื่อผู้ใช้ (Username) *")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
+            // 🟢 HIG: ใช้ ScrollView เพื่อป้องกัน Keyboard บังปุ่มกดยืนยันด้านล่าง
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 32) {
                     
-                    TextField("กรอกชื่อที่เพื่อนๆ จะเห็น...", text: $viewModel.username)
+                    // --- 1. ส่วนหัว (Header) ---
+                    VStack(spacing: 12) {
+                        Text("สร้างโปรไฟล์นักเดินทาง")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                            .multilineTextAlignment(.center)
+                        
+                        // 🟢 HIG: เพิ่มคำอธิบายสั้นๆ ให้ผู้ใช้เข้าใจถึงประโยชน์ของการตั้งโปรไฟล์
+                        Text("เพิ่มรูปภาพและชื่อของคุณ\nเพื่อให้เพื่อนร่วมทริปจดจำคุณได้ง่ายขึ้น")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                    .padding(.top, 40)
+                    
+                    // --- 2. ส่วนเลือกรูปโปรไฟล์ ---
+                    profileImagePickerSection
+                    
+                    // --- 3. ส่วนกรอกชื่อผู้ใช้ ---
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("ชื่อผู้ใช้")
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 16)
+                        
+                        HStack {
+                            TextField("ชื่อที่เพื่อนๆ จะเห็น...", text: $viewModel.username)
+                                .focused($isTextFieldFocused)
+                                .autocorrectionDisabled()
+                                .textInputAutocapitalization(.never)
+                                .submitLabel(.done) // 🟢 เปลี่ยนปุ่ม Return เป็น Done
+                                .onSubmit { isTextFieldFocused = false } // กด Done แล้วซ่อนคีย์บอร์ด
+                            
+                            // 🟢 HIG: ปุ่ม Clear ข้อความแบบรวดเร็ว
+                            if !viewModel.username.isEmpty {
+                                Button(action: { viewModel.username = "" }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(Color(.systemGray3))
+                                }
+                            }
+                        }
                         .padding()
-                        .background(Color(.systemGray6))
-                        .cornerRadius(12)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                }
-                .padding(.horizontal, 24)
-                
-                Spacer()
-                
-                // 4. ปุ่มยืนยัน
-                Button(action: {
-                    viewModel.saveProfile(context: modelContext) // 🟢 2. ส่ง context ไปให้เซฟ
-                }) {
-                    Text("เข้าสู่ระบบ TrailGuide")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(viewModel.isFormValid ? Color.blue : Color.gray.opacity(0.5))
+                        .background(Color(.systemBackground)) // สีขาวใน Light Mode, สีดำใน Dark Mode
                         .cornerRadius(16)
+                        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                    }
+                    .padding(.horizontal, 24)
+                    
+                    Spacer(minLength: 40)
+                    
+                    // --- 4. ปุ่มยืนยัน ---
+                    Button(action: {
+                        isTextFieldFocused = false
+                        viewModel.saveProfile(context: modelContext)
+                    }) {
+                        Text("เข้าสู่ระบบ TrailGuide")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                    }
+                    // 🟢 HIG: ใช้ Native Button Style (ปุ่มจะกลายเป็นสีเทาอัตโนมัติเมื่อ Disabled)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .tint(.green)
+                    .disabled(!viewModel.isFormValid)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
+                    
                 }
-                .disabled(!viewModel.isFormValid) // ปุ่มจะกดไม่ได้ถ้ายังไม่กรอกชื่อ
-                .padding(.horizontal, 24)
-                .padding(.bottom, 24)
-                
             }
+            // 🟢 HIG: สีพื้นหลังสำหรับหน้ารับข้อมูล
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .navigationBarHidden(true)
+            // 🟢 แตะพื้นที่ว่างเพื่อซ่อน Keyboard
+            .onTapGesture {
+                isTextFieldFocused = false
+            }
         }
     }
     
     // MARK: - UI Components
-    
-    // แยกโค้ดส่วนเลือกรูปภาพออกมาให้ดูสะอาดตา
     private var profileImagePickerSection: some View {
         PhotosPicker(selection: $viewModel.selectedPhotoItem, matching: .images) {
             ZStack {
-                // ถ้ามีรูปแล้ว ให้แสดงรูป
                 if let image = viewModel.profileImage {
                     image
                         .resizable()
                         .scaledToFill()
-                        .frame(width: 120, height: 120)
+                        .frame(width: 130, height: 130)
                         .clipShape(Circle())
-                        .overlay(Circle().stroke(Color.blue, lineWidth: 2))
+                        .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 4))
+                        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
                 } else {
-                    // ถ้ายังไม่มีรูป ให้แสดง Placeholder
                     ZStack {
                         Circle()
-                            .fill(Color(.systemGray5))
-                            .frame(width: 120, height: 120)
+                            .fill(Color(.secondarySystemBackground))
+                            .frame(width: 130, height: 130)
+                            .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
                         
                         Image(systemName: "camera.fill")
                             .font(.system(size: 40))
-                            .foregroundColor(.gray)
+                            .foregroundColor(.gray.opacity(0.8))
                     }
                 }
                 
-                // ไอคอนเครื่องหมายบวก (Badge)
+                // Badge วงกลมเครื่องหมายบวก
                 Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 28))
-                    .foregroundColor(.blue)
-                    .background(Circle().fill(Color.white))
-                    .offset(x: 40, y: 40)
+                    .font(.system(size: 32))
+                    .foregroundColor(.green) // คุมโทนสีให้เป็นสีเขียว TrailGuide
+                    .background(Circle().fill(Color(.systemBackground)))
+                    .offset(x: 45, y: 45)
             }
         }
         .padding(.vertical, 16)
+        // 🟢 HIG: ให้ Feedback เวลาผู้ใช้นิ้วแตะที่รูปภาพ
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
-// MARK: - Preview
 #Preview {
     ProfileSetupView()
 }

@@ -6,8 +6,8 @@
     <string>TrailGuide ต้องการใช้ Local Network และ Bluetooth เพื่อค้นหาเพื่อนนักเดินทางรอบตัวคุณ</string>
     <key>NSBonjourServices</key>
     <array>
-        <string>_trail-p2p._tcp</string>
-        <string>_trail-p2p._udp</string>
+        <string>_trailguide-p2p._tcp</string>
+        <string>_trailguide-p2p._udp</string>
     </array>
 </dict>
 </plist>

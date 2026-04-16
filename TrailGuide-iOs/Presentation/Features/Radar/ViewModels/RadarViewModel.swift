@@ -7,7 +7,7 @@ final class RadarViewModel {
     var profileImage: UIImage? = nil
     
     // 🟢 แก้ให้รับ UserRepository เพื่อให้ตรงกับที่ส่งมาจาก MainTabView
-     let userRepository: UserRepositoryProtocol?
+    let userRepository: UserRepositoryProtocol?
     
     init(userRepository: UserRepositoryProtocol?) {
         self.userRepository = userRepository

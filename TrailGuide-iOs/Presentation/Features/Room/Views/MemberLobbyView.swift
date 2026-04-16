@@ -3,71 +3,103 @@ import MultipeerConnectivity
 
 struct MemberLobbyView: View {
     @ObservedObject var viewModel: RoomViewModel
-    @Environment(\.dismiss) var dismiss
-
+    
     var body: some View {
-        List {
-            Section {
-                VStack(spacing: 16) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.green.opacity(0.1))
-                            .frame(width: 80, height: 80)
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 40))
-                            .foregroundColor(.green)
-                    }
-                    .padding(.top, 8)
-
-                    Text("เข้าร่วมสำเร็จแล้ว!")
-                        .font(.headline)
-                    Text("รอหัวหน้าทริปเริ่มการเดินทาง")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-            }
-            .listRowBackground(Color.clear)
-
-            Section("สมาชิกในกลุ่ม") {
-                ForEach(viewModel.sessionManager.connectedPeers, id: \.self) { peer in
-                    HStack(spacing: 12) {
+        NavigationStack {
+            List {
+                Section {
+                    VStack(spacing: 16) {
                         ZStack {
                             Circle()
-                                .fill(Color.green.opacity(0.15))
-                                .frame(width: 36, height: 36)
-                            Text(String(peer.displayName.prefix(1)).uppercased())
-                                .font(.system(size: 15, weight: .semibold))
+                                .fill(Color.green.opacity(0.1))
+                                .frame(width: 80, height: 80)
+                            Image(systemName: "person.line.dotted.person.fill")
+                                .font(.system(size: 36))
                                 .foregroundColor(.green)
+                                .symbolEffect(.pulse)
                         }
-                        Text(peer.displayName)
-                            .fontWeight(.medium)
-                        Spacer()
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
+                        .padding(.top, 8)
+                        
+                        Text("เชื่อมต่อสำเร็จแล้ว")
+                            .font(.headline)
+                        Text("กรุณารอหัวหน้าทริปเริ่มต้นการเดินทาง\nโปรดอย่าปิดหน้านี้เพื่อรักษาการเชื่อมต่อ")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
                     }
-                    .padding(.vertical, 4)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+                .listRowBackground(Color.clear)
+
+                Section(header: Text("เพื่อนร่วมเดินทาง (\(viewModel.allMembers.count))")) {
+                    ForEach(viewModel.allMembers, id: \.self) { peer in
+                        memberRow(for: peer)
+                    }
                 }
             }
-        }
-        .navigationTitle("ห้องพักคอย")
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button("ออกจากกลุ่ม", role: .destructive) {
+            .navigationTitle("รอการตอบรับ")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("ออกจากกลุ่ม", role: .destructive) {
+                        viewModel.leaveRoom()
+                    }
+                }
+            }
+            // 🟢 ดักจับเมื่อ Host ปิดห้อง หรือหลุด
+            .onChange(of: viewModel.sessionManager.connectedPeers) { _, newValue in
+                if newValue.isEmpty {
+                    viewModel.showHostEndedAlert = true
                     viewModel.leaveRoom()
-                    dismiss()
                 }
             }
         }
-        // ถ้าถูกเตะออกจากกลุ่ม ให้กลับไปหน้าหลัก
-        .onChange(of: viewModel.sessionManager.connectedPeers) { _, newValue in
-            if newValue.isEmpty {
-                viewModel.leaveRoom()
-                dismiss()
+    }
+
+    @ViewBuilder
+    private func memberRow(for peer: MCPeerID) -> some View {
+        let isMe = peer == viewModel.sessionManager.myPeerId
+        let isHost = viewModel.isHost(peer)
+        
+        HStack(spacing: 12) {
+            ZStack {
+                if let uiImage = viewModel.peerImages[peer] {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 40, height: 40)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(isHost ? Color.orange : Color.green, lineWidth: 1.5))
+                } else {
+                    Circle()
+                        .fill(isHost ? Color.orange.opacity(0.1) : Color.green.opacity(0.1))
+                        .frame(width: 40, height: 40)
+                    Text(String(peer.displayName.prefix(1)).uppercased())
+                        .fontWeight(.bold)
+                        .foregroundColor(isHost ? .orange : .green)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text(peer.displayName)
+                        .font(.headline)
+                    if isMe { Text("(คุณ)").font(.caption2).foregroundColor(.secondary) }
+                }
+                Text(isHost ? "หัวหน้าทริป" : "สมาชิก")
+                    .font(.caption)
+                    .foregroundColor(isHost ? .orange : .secondary)
+            }
+            
+            Spacer()
+            
+            if isHost {
+                Image(systemName: "crown.fill").foregroundColor(.orange).font(.caption)
+            } else {
+                Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
             }
         }
+        .padding(.vertical, 4)
     }
 }
