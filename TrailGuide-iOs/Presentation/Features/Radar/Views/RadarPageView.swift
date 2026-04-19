@@ -16,18 +16,18 @@ struct RadarPageView: View {
                 TrackingView(viewModel: roomViewModel)
             } else if roomViewModel.amIHost {
                 LobbyView(viewModel: roomViewModel)
-            } else if !roomViewModel.sessionManager.connectedPeers.isEmpty {
+            } else if !roomViewModel.connectedPeers.isEmpty { // 🟢 แก้ไขบรรทัดนี้
                 MemberLobbyView(viewModel: roomViewModel)
             } else {
                 roleSelectionView
             }
         }
         .animation(.easeInOut, value: roomViewModel.amIHost)
-        .animation(.easeInOut, value: roomViewModel.sessionManager.connectedPeers.isEmpty)
+        .animation(.easeInOut, value: roomViewModel.connectedPeers.isEmpty) // 🟢 แก้ไขบรรทัดนี้
         .animation(.easeInOut, value: roomViewModel.isAdventureStarted)
         .alert(
             "กลุ่มถูกยกเลิกแล้ว",
-            isPresented: $roomViewModel.showHostEndedAlert
+            isPresented: $roomViewModel.showHostEndedAlert // 🟢 ใช้งานได้แล้ว
         ) {
             Button("ตกลง", role: .cancel) { }
         } message: {
@@ -38,7 +38,7 @@ struct RadarPageView: View {
     // MARK: - UI Components
     private var roleSelectionView: some View {
         NavigationStack {
-            ScrollView(showsIndicators: false) { // ซ่อนแถบ Scroll ให้ดูคลีน
+            ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 32) {
                     
                     // --- 1. Header Section ---
@@ -75,17 +75,15 @@ struct RadarPageView: View {
                         )
                     }
                     
-                    // 🟢 --- 3. เพิ่มใหม่: System Status & Quick Tips ---
+                    // --- 3. System Status & Quick Tips ---
                     VStack(alignment: .leading, spacing: 20) {
                         Text("ข้อแนะนำก่อนเดินทาง")
                             .font(.title3)
                             .fontWeight(.bold)
                             .padding(.top, 8)
                         
-                        // ป้ายเตือนเปิด Bluetooth / Wi-Fi
                         infoBannerView
                         
-                        // สเต็ปการใช้งาน
                         VStack(spacing: 16) {
                             stepRow(icon: "1.circle.fill", text: "ให้หัวหน้าทริปกด 'ตั้งกลุ่ม' เพียง 1 คนเท่านั้น")
                             stepRow(icon: "2.circle.fill", text: "สมาชิกที่เหลือกด 'เข้าร่วม' และสแกนหาหัวหน้าทริป")
@@ -107,7 +105,6 @@ struct RadarPageView: View {
         }
     }
     
-    // 🟢 Component ใหม่: ป้ายเตือนการเปิดสัญญาณ
     private var infoBannerView: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -133,7 +130,6 @@ struct RadarPageView: View {
         )
     }
     
-    // 🟢 Component ใหม่: แถวอธิบายขั้นตอน
     private func stepRow(icon: String, text: String) -> some View {
         HStack(alignment: .center, spacing: 12) {
             Image(systemName: icon)
@@ -155,7 +151,7 @@ struct RadarPageView: View {
                     .scaledToFill()
                     .frame(width: 50, height: 50)
                     .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2) // 🟢 เพิ่มเงาเล็กน้อย
+                    .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
             } else {
                 Circle()
                     .fill(Color.green.opacity(0.15))
@@ -169,11 +165,9 @@ struct RadarPageView: View {
         }
     }
     
-    // 🟢 HIG: ออกแบบ Card ใหม่ให้กดแล้วยุบตัว ดูแยกแยะความสำคัญชัดเจน
     private func roleCard(title: String, subtitle: String, icon: String, isPrimary: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 16) {
-                // Icon Background
                 ZStack {
                     Circle()
                         .fill(isPrimary ? Color.white.opacity(0.2) : Color.green.opacity(0.15))
@@ -199,22 +193,17 @@ struct RadarPageView: View {
             }
             .padding(20)
             .frame(maxWidth: .infinity, maxHeight: 190, alignment: .topLeading)
-            // 🟢 HIG: แยกสีพื้นหลังชัดเจน (Primary = สีเขียวทึบ, Secondary = สีขาว/เทาของระบบ)
             .background(isPrimary ? Color.green : Color(.secondarySystemGroupedBackground))
-            .cornerRadius(24) // 🟢 HIG: มุมโค้งแบบแอปยุคใหม่ของ Apple
-            // 🟢 HIG: เพิ่มมิติให้การ์ด
+            .cornerRadius(24)
             .shadow(color: isPrimary ? Color.green.opacity(0.3) : Color.black.opacity(0.05), radius: 10, x: 0, y: 4)
         }
-        // 🟢 นำ Custom ButtonStyle มาใช้เพื่อให้ปุ่มยุบตอนกด
         .buttonStyle(SquishyCardButtonStyle())
     }
 }
 
-// MARK: - Custom Styles (HIG Interactive Feedback)
 struct SquishyCardButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-        // 🟢 เมื่อเอานิ้วกด การ์ดจะย่อลง 4% และจางลงนิดหน่อย
             .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
             .opacity(configuration.isPressed ? 0.9 : 1.0)
             .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.6, blendDuration: 0), value: configuration.isPressed)

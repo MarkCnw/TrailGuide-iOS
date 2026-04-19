@@ -42,10 +42,10 @@ struct LobbyView: View {
                         }
                         .padding(.vertical, 8)
                     }
-                    .listRowBackground(RoundedRectangle(cornerRadius: 12).fill(viewModel.sessionManager.connectedPeers.isEmpty ? Color.gray : Color.green))
-                    .disabled(viewModel.sessionManager.connectedPeers.isEmpty)
+                    .listRowBackground(RoundedRectangle(cornerRadius: 12).fill(viewModel.connectedPeers.isEmpty ? Color.gray : Color.green))
+                    .disabled(viewModel.connectedPeers.isEmpty)
                 } footer: {
-                    if viewModel.sessionManager.connectedPeers.isEmpty {
+                    if viewModel.connectedPeers.isEmpty {
                         Text("ต้องมีสมาชิกอย่างน้อย 1 คนเพื่อเริ่มการเดินทาง")
                     }
                 }
@@ -57,21 +57,19 @@ struct LobbyView: View {
                     Button("ยกเลิกกลุ่ม", role: .destructive) { showCancelConfirm = true }
                 }
             }
-            .onAppear { viewModel.startHosting() }
             .confirmationDialog("คุณแน่ใจหรือไม่ที่จะยกเลิกกลุ่ม?", isPresented: $showCancelConfirm, titleVisibility: .visible) {
-                Button("ยกเลิกกลุ่ม (สมาชิกทั้งหมดจะหลุด)", role: .destructive) { viewModel.leaveRoom() }
+                Button("ยกเลิกกลุ่ม (สมาชิกทั้งหมดจะหลุด)", role: .destructive) { viewModel.leaveRoom(source: "LobbyView - ยกเลิกกลุ่ม") }
                 Button("ปิด", role: .cancel) {}
             }
-            // 🟢 แก้ไข Alert ตรงนี้ ป้องกันการส่งค่าปฏิเสธอัตโนมัติ
             .alert(
-                "\(viewModel.sessionManager.pendingInvitation?.peer.displayName ?? "เพื่อน") ขอเข้าร่วมกลุ่ม",
+                "\(viewModel.pendingInvitationPeerName) ขอเข้าร่วมกลุ่ม",
                 isPresented: Binding(
-                    get: { viewModel.sessionManager.pendingInvitation != nil },
-                    set: { _ in } // 🟢 ลบ viewModel.declineInvitation() ออก เพื่อไม่ให้ตีกับปุ่มกด
+                    get: { viewModel.showInvitationAlert },
+                    set: { viewModel.showInvitationAlert = $0 }
                 )
             ) {
                 Button("ยอมรับ") { viewModel.acceptInvitation() }
-                Button("ปฏิเสธ", role: .cancel) { viewModel.declineInvitation() }
+                Button("ปฏิเสธ") { viewModel.declineInvitation() }
             } message: {
                 Text("คุณต้องการอนุญาตให้บุคคลนี้เข้าร่วมการติดตามเรดาร์หรือไม่?")
             }
@@ -80,12 +78,13 @@ struct LobbyView: View {
 
     @ViewBuilder
     private func memberRow(for peer: MCPeerID) -> some View {
-        let isMe = peer == viewModel.sessionManager.myPeerId
+        let isMe = peer == viewModel.allMembers.first
         let isHost = viewModel.isHost(peer)
         
         HStack(spacing: 12) {
             ZStack {
-                if let uiImage = viewModel.peerImages[peer] {
+                // 🟢 แก้จุดนี้: ดึงรูปจาก TrailMember แทน Dictionary เก่า
+                if let uiImage = viewModel.trailMembers[peer]?.profileImage {
                     Image(uiImage: uiImage).resizable().scaledToFill().frame(width: 40, height: 40)
                         .clipShape(Circle()).overlay(Circle().stroke(isHost ? Color.orange : Color.green, lineWidth: 1.5))
                 } else {

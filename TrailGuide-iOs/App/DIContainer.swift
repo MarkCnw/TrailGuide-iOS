@@ -1,20 +1,45 @@
+// 📁 App/DIContainer.swift
 import Foundation
-import SwiftData // 👈 เพิ่มบรรทัดนี้
+import SwiftData
 
-// ตัวอย่างการสร้าง
-let sharedModelContainer = try! ModelContainer(for: UserProfileSchema.self)
-let modelContext = ModelContext(sharedModelContainer)
-
-// นำไปฉีด (Inject) ใส่ Repository
-let userRepository = UserRepositoryImpl(modelContext: modelContext)
-// ใน DIContainer.swift (ตัวอย่างการสร้าง)
-func makeRadarViewModel() -> RadarViewModel {
-    // 1. สร้าง Repository
-    let repo = UserRepositoryImpl(modelContext: modelContext)
+class DIContainer {
     
-    // 2. สร้าง Use Case แล้วฉีด Repository เข้าไป
-    let useCase = GetUserProfileUseCase(userRepository: repo)
+    // Singleton (ถ้าโปรเจคใช้แบบนี้)
+    static let shared = DIContainer()
     
-    // 3. สร้าง ViewModel แล้วฉีด Use Case เข้าไป
-    return RadarViewModel(userRepository: userRepository)
+    private let modelContext: ModelContext
+    
+    // 1. สร้าง Service หลักเก็บไว้เป็น Single Instance (เพื่อให้ใช้แชร์กันได้)
+    lazy var locationService: LocationServiceProtocol = LocationManager()
+    
+    // 2. UserRepository
+    lazy var userRepository: UserRepositoryProtocol = UserRepositoryImpl(modelContext: modelContext)
+    
+    init() {
+        // Setup SwiftData Context
+        let sharedModelContainer = try! ModelContainer(for: UserProfileSchema.self)
+        self.modelContext = ModelContext(sharedModelContainer)
+    }
+    
+ 
+    // 3. ฟังก์ชันสร้าง RoomViewModel
+        func makeRoomViewModel() -> RoomViewModel {
+            // 🚨 P2P Manager เราต้องสร้างใหม่ตาม Username ปัจจุบัน
+            let name = UserDefaults.standard.string(forKey: "username") ?? "นักเดินทาง"
+            let p2pService = MultipeerSessionManager(username: name)
+            
+            // สร้าง Use Case
+            let processImageUseCase = ProcessProfileImageUseCase()
+            let sendSOSUseCase = SendSOSUseCase(p2pService: p2pService)
+            
+            // ประกอบร่าง!
+            return RoomViewModel(
+                p2pService: p2pService,
+                locationService: locationService,
+                userRepository: userRepository,
+                processImageUseCase: processImageUseCase,
+                sendSOSUseCase: sendSOSUseCase
+            )
+        }
+    
 }

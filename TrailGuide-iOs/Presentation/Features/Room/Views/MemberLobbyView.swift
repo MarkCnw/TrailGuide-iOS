@@ -4,6 +4,8 @@ import MultipeerConnectivity
 struct MemberLobbyView: View {
     @ObservedObject var viewModel: RoomViewModel
     
+    @State private var disconnectTask: Task<Void, Never>?
+    
     var body: some View {
         NavigationStack {
             List {
@@ -43,28 +45,42 @@ struct MemberLobbyView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("ออกจากกลุ่ม", role: .destructive) {
-                        viewModel.leaveRoom()
+                        disconnectTask?.cancel()
+                        viewModel.leaveRoom(source: "MemberLobbyView - User Tap")
                     }
                 }
             }
-            // 🟢 ดักจับเมื่อ Host ปิดห้อง หรือหลุด
-            .onChange(of: viewModel.sessionManager.connectedPeers) { _, newValue in
+            .onChange(of: viewModel.connectedPeers) { _, newValue in
                 if newValue.isEmpty {
-                    viewModel.showHostEndedAlert = true
-                    viewModel.leaveRoom()
+                    disconnectTask?.cancel()
+                    disconnectTask = Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 5_000_000_000)
+                        guard !Task.isCancelled else { return }
+                        if viewModel.connectedPeers.isEmpty {
+                            viewModel.showHostEndedAlert = true
+                            viewModel.leaveRoom(source: "MemberLobbyView - Host disconnected > 5s")
+                        }
+                    }
+                } else {
+                    disconnectTask?.cancel()
+                    disconnectTask = nil
                 }
+            }
+            .onDisappear {
+                disconnectTask?.cancel()
             }
         }
     }
 
     @ViewBuilder
     private func memberRow(for peer: MCPeerID) -> some View {
-        let isMe = peer == viewModel.sessionManager.myPeerId
+        let isMe = peer == viewModel.allMembers.first
         let isHost = viewModel.isHost(peer)
         
         HStack(spacing: 12) {
             ZStack {
-                if let uiImage = viewModel.peerImages[peer] {
+                // 🟢 แก้จุดนี้: ดึงรูปจาก TrailMember เหมือนกัน
+                if let uiImage = viewModel.trailMembers[peer]?.profileImage {
                     Image(uiImage: uiImage)
                         .resizable()
                         .scaledToFill()

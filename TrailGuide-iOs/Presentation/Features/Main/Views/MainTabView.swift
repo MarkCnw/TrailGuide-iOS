@@ -8,7 +8,9 @@ struct MainTabView: View {
     
     init(userRepository: UserRepositoryProtocol) {
         self.userRepository = userRepository
-        _roomViewModel = StateObject(wrappedValue: RoomViewModel(userRepository: userRepository))
+        
+        // 🟢 เปลี่ยนจากสร้างตรงๆ มาให้ DIContainer ประกอบร่าง RoomViewModel ให้
+        _roomViewModel = StateObject(wrappedValue: DIContainer.shared.makeRoomViewModel())
         
         // 🟢 1. การตั้งค่า UI ของ TabBar (สีพื้นหลัง และ สีไอคอนที่ไม่ได้เลือก)
         let appearance = UITabBarAppearance()

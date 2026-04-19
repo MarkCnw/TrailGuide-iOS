@@ -1,7 +1,6 @@
 import SwiftUI
 import MultipeerConnectivity
 
-
 struct ScanView: View {
     @ObservedObject var viewModel: RoomViewModel
     @Environment(\.dismiss) var dismiss
@@ -12,7 +11,7 @@ struct ScanView: View {
     var body: some View {
         NavigationStack {
             VStack {
-                if viewModel.sessionManager.connectedPeers.isEmpty {
+                if viewModel.connectedPeers.isEmpty {
                     VStack(spacing: 32) {
                         Spacer()
                         ZStack {
@@ -26,11 +25,11 @@ struct ScanView: View {
                         Text("กำลังค้นหาหัวหน้าทริป...").font(.headline)
                         
                         VStack(alignment: .leading) {
-                            Text("พบหัวหน้าทริป (\(viewModel.sessionManager.availablePeers.count))")
+                            Text("พบหัวหน้าทริป (\(viewModel.availablePeers.count))")
                                 .font(.subheadline).foregroundColor(.secondary).padding(.horizontal)
                             
                             ScrollView {
-                                ForEach(viewModel.sessionManager.availablePeers, id: \.self) { peer in
+                                ForEach(viewModel.availablePeers, id: \.self) { peer in
                                     peerRow(for: peer)
                                 }
                             }
@@ -53,7 +52,7 @@ struct ScanView: View {
             .onDisappear { viewModel.stopBrowsing() }
             
             // 🟢 ดักจับเมื่อเชื่อมต่อสำเร็จ
-            .onChange(of: viewModel.sessionManager.connectedPeers) { _, newValue in
+            .onChange(of: viewModel.connectedPeers) { _, newValue in
                 if !newValue.isEmpty {
                     joiningPeer = nil
                     rejectedPeer = nil
@@ -61,7 +60,7 @@ struct ScanView: View {
             }
             
             // 🟢 ดักจับเมื่อถูกปฏิเสธ (เพื่อไม่ให้ UI ค้าง)
-            .onChange(of: viewModel.sessionManager.lastConnectionError) { _, errorPeer in
+            .onChange(of: viewModel.lastConnectionError) { _, errorPeer in
                 if let peer = errorPeer, joiningPeer == peer {
                     handleRejection(for: peer)
                 }
@@ -73,7 +72,7 @@ struct ScanView: View {
     private func peerRow(for peer: MCPeerID) -> some View {
         Button(action: {
             // 🟢 ล้างคราบสถานะเก่าทิ้งก่อนกด Join รอบใหม่เสมอ
-            viewModel.sessionManager.lastConnectionError = nil
+            viewModel.lastConnectionError = nil
             rejectedPeer = nil
             joiningPeer = peer
             
@@ -114,7 +113,7 @@ struct ScanView: View {
         rejectedPeer = peer
         
         // ล้างค่า Error ทันทีเพื่อให้กดขอเข้าร่วมใหม่ได้
-        viewModel.sessionManager.lastConnectionError = nil
+        viewModel.lastConnectionError = nil
         
         // ให้ป้าย "ถูกปฏิเสธ" หายไปเองใน 3 วินาที
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
