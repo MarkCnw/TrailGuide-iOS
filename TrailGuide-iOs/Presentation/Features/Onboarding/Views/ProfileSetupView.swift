@@ -17,7 +17,7 @@ struct ProfileSetupView: View {
                     
                     // --- 1. ส่วนหัว (Header) ---
                     VStack(spacing: 12) {
-                        Text("สร้างโปรไฟล์นักเดินทาง")
+                        Text("สร้างโปรไฟล์")
                             .font(.largeTitle)
                             .fontWeight(.bold)
                             .multilineTextAlignment(.center)

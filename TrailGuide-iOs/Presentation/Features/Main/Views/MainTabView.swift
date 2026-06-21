@@ -40,17 +40,26 @@ struct MainTabView: View {
                 }
                 .tag(0)
             
-            HistoryView()
+            // 🟢 แท็บเส้นทาง (Breadcrumb) — บังคับ Dark Mode ทั้งแท็บ
+                        BreadcrumbView(viewModel: DIContainer.shared.makeBreadcrumbViewModel())
+                            .preferredColorScheme(.dark)
+                            .tabItem {
+                                Label("เส้นทาง", systemImage: "shoeprints.fill")
+                            }
+                            .tag(1)
+            
+            // 🟢 แท็บประวัติ (History)
+            HistoryView(viewModel: DIContainer.shared.makeHistoryViewModel())
                 .tabItem {
-                    Label("ประวัติ", systemImage: "clock")
+                    Label("ประวัติ", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
                 }
-                .tag(1)
+                .tag(2)
             
             ProfileSettingsView(userRepository: userRepository)
                 .tabItem {
                     Label("โปรไฟล์", systemImage: "person")
                 }
-                .tag(2)
+                .tag(3)
         }
         .environmentObject(roomViewModel)
         
@@ -58,3 +67,4 @@ struct MainTabView: View {
         .tint(.green) // 🎨 ลองเปลี่ยนเป็น .blue, .orange หรือ Color("CustomColor") ได้เลยครับ
     }
 }
+

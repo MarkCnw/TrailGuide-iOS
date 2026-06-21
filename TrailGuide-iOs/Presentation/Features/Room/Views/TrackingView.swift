@@ -20,6 +20,22 @@ struct TrackingView: View {
         NavigationStack {
             ZStack {
                 VStack(spacing: 0) {
+                    // 🟢 Reconnection Banner
+                    if viewModel.isReconnecting {
+                        HStack(spacing: 12) {
+                            ProgressView()
+                                .tint(.white)
+                            Text("กำลังเชื่อมต่อใหม่...")
+                                .font(.subheadline)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.orange)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                    
                     // --- 1. โซนเรดาร์ ---
                     radarSection
                         .frame(height: UIScreen.main.bounds.height * 0.45)
@@ -87,11 +103,12 @@ struct TrackingView: View {
                     dismissButton: .default(Text("ตกลง"))
                 )
             }
-            .onChange(of: viewModel.sosIncomingFrom) { oldValue, newValue in
-                if newValue != nil {
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.error)
-                }
+            .alert(isPresented: $viewModel.showSOSReceivedAlert) {
+                Alert(
+                    title: Text("🚨 สัญญาณฉุกเฉิน!"),
+                    message: Text("คุณ \(viewModel.latestSOSPeerName) ต้องการความช่วยเหลือด่วน!"),
+                    dismissButton: .default(Text("รับทราบ"))
+                )
             }
             .sheet(isPresented: $viewModel.showTripSummary) {
                 TripSummaryView(viewModel: viewModel)
@@ -162,19 +179,29 @@ struct TrackingView: View {
                             
                             let lastSeenDate = viewModel.trailMembers[peer]?.lastSeen
                             let isDisconnected = lastSeenDate.map { self.currentTime.timeIntervalSince($0) > 30 } ?? false
+                            let isSOSActive = viewModel.sosActivePeers.contains(peer) // 🟢 ตรวจสอบสถานะ SOS
                             
                             ZStack {
+                                // 🟢 ไฮไลต์สีแดงแบบกระพริบบนเรดาร์สำหรับคนที่กำลังขอความช่วยเหลือ
+                                if isSOSActive {
+                                    Circle()
+                                        .fill(Color.red.opacity(0.5))
+                                        .frame(width: 50, height: 50)
+                                        .scaleEffect(1.3)
+                                        .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: isSOSActive)
+                                }
+                                
                                 if let uiImage = viewModel.trailMembers[peer]?.profileImage {
                                     Image(uiImage: uiImage)
                                         .resizable().scaledToFill()
                                         .frame(width: 36, height: 36)
                                         .clipShape(Circle())
-                                        .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                                        .overlay(Circle().stroke(isSOSActive ? Color.red : Color.white, lineWidth: isSOSActive ? 3 : 2))
                                         .shadow(radius: 3)
                                         .grayscale(isDisconnected ? 0.99 : 0.0)
                                         .opacity(isDisconnected ? 0.6 : 1.0)
                                 } else {
-                                    Circle().fill(isDisconnected ? Color.gray : Color.orange).frame(width: 36, height: 36)
+                                    Circle().fill(isDisconnected ? Color.gray : (isSOSActive ? Color.red : Color.orange)).frame(width: 36, height: 36)
                                         .shadow(radius: 3)
                                     Text(String(peer.displayName.prefix(1)).uppercased())
                                         .font(.caption).fontWeight(.bold).foregroundColor(.white)
@@ -229,6 +256,8 @@ struct TrackingView: View {
         let coordText = isDisconnected
             ? ""
             : getCoordText(peer: peer, isDisconnected: false, secondsSinceLastSeen: secondsSinceLastSeen)
+            
+        let isSOSActive = viewModel.sosActivePeers.contains(peer) // 🟢 ตรวจสอบสถานะ SOS
         
         HStack(spacing: 12) {
             ZStack {
@@ -237,16 +266,16 @@ struct TrackingView: View {
                         .resizable().scaledToFill()
                         .frame(width: 44, height: 44)
                         .clipShape(Circle())
-                        .overlay(Circle().stroke(isHost ? Color.orange : Color.green, lineWidth: 2))
+                        .overlay(Circle().stroke(isSOSActive ? Color.red : (isHost ? Color.orange : Color.green), lineWidth: isSOSActive ? 3 : 2))
                         .grayscale(isDisconnected ? 0.99 : 0.0)
                         .opacity(isDisconnected ? 0.6 : 1.0)
                 } else {
                     Circle()
-                        .fill(isDisconnected ? Color.gray.opacity(0.15) : (isHost ? Color.orange.opacity(0.15) : Color.green.opacity(0.15)))
+                        .fill(isDisconnected ? Color.gray.opacity(0.15) : (isSOSActive ? Color.red.opacity(0.15) : (isHost ? Color.orange.opacity(0.15) : Color.green.opacity(0.15))))
                         .frame(width: 44, height: 44)
                     Text(String(peer.displayName.prefix(1)).uppercased())
                         .fontWeight(.bold)
-                        .foregroundColor(isDisconnected ? .gray : (isHost ? .orange : .green))
+                        .foregroundColor(isDisconnected ? .gray : (isSOSActive ? .red : (isHost ? .orange : .green)))
                 }
             }
 
@@ -254,7 +283,13 @@ struct TrackingView: View {
                 HStack(spacing: 4) {
                     Text(peer.displayName)
                         .fontWeight(.semibold)
-                        .foregroundColor(isDisconnected ? .secondary : .primary)
+                        .foregroundColor(isDisconnected ? .secondary : (isSOSActive ? .red : .primary))
+                    
+                    if isSOSActive {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.red)
+                            .font(.caption)
+                    }
                 }
                 
                 HStack(spacing: 4) {
@@ -297,6 +332,7 @@ struct TrackingView: View {
             }
         }
         .padding(.vertical, 6)
+        .background(isSOSActive ? Color.red.opacity(0.05) : Color.clear)
     }
     
     // --- Component: ปุ่ม SOS (Long Press) ---

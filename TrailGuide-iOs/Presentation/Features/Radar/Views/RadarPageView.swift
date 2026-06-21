@@ -102,6 +102,11 @@ struct RadarPageView: View {
             .sheet(isPresented: $showScanSheet) {
                 ScanView(viewModel: roomViewModel)
             }
+            .onChange(of: roomViewModel.connectedPeers) { _, peers in
+                if !peers.isEmpty && showScanSheet {
+                    showScanSheet = false
+                }
+            }
         }
     }
     

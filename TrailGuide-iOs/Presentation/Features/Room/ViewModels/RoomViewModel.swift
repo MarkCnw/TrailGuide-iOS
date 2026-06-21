@@ -17,9 +17,15 @@ class RoomViewModel: ObservableObject {
     @Published var amIHost: Bool = false
     @Published var showTripSummary: Bool = false
     @Published var tripStartTime: Date?
-    @Published var sosIncomingFrom: String? = nil
-    @Published var showHostEndedAlert: Bool = false // 🟢 เพิ่มกลับมาให้
+    // 🟢 ตัวแปรสำหรับฟีเจอร์ SOS ใหม่
+    @Published var sosIncomingFrom: String?
+    @Published var sosActivePeers: Set<MCPeerID> = []
+    @Published var showSOSReceivedAlert: Bool = false
+    @Published var latestSOSPeerName: String = ""
+    
+    @Published var showHostEndedAlert: Bool = false
     @Published var trailMembers: [MCPeerID: TrailMember] = [:]
+    @Published var isReconnecting: Bool = false // 🟢 UI feedback for auto-reconnect
     
     private var myProfileImageData: Data?
     private var cancellables = Set<AnyCancellable>()
@@ -36,9 +42,30 @@ class RoomViewModel: ObservableObject {
     }
     
     private func setupBindings() {
-        p2pService.availablePeersPublisher.receive(on: DispatchQueue.main).sink { [weak self] peers in self?.availablePeers = peers }.store(in: &cancellables)
+        p2pService.availablePeersPublisher.receive(on: DispatchQueue.main).sink { [weak self] peers in 
+            self?.availablePeers = peers 
+            
+            // 🟢 Auto-invite on rediscovery
+            if self?.isAdventureStarted == true && self?.p2pService.isReconnecting == true {
+                for peer in peers {
+                    if self?.p2pService.knownPeerNames.contains(peer.displayName) == true {
+                        self?.p2pService.invitePeer(peer)
+                    }
+                }
+            }
+        }.store(in: &cancellables)
+        
         p2pService.lastConnectionErrorPublisher.receive(on: DispatchQueue.main).sink { [weak self] error in self?.lastConnectionError = error }.store(in: &cancellables)
-        p2pService.connectedPeersPublisher.receive(on: DispatchQueue.main).sink { [weak self] peers in self?.connectedPeers = peers }.store(in: &cancellables)
+        
+        p2pService.connectedPeersPublisher.receive(on: DispatchQueue.main).sink { [weak self] peers in 
+            self?.connectedPeers = peers 
+            self?.handleConnectionChange(peers: peers)
+        }.store(in: &cancellables)
+        
+        p2pService.isReconnectingPublisher.receive(on: DispatchQueue.main).sink { [weak self] reconnecting in 
+            self?.isReconnecting = reconnecting 
+        }.store(in: &cancellables)
+        
         p2pService.objectWillChangePublisher.sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &cancellables)
         
         p2pService.connectedPeersPublisher
@@ -56,14 +83,45 @@ class RoomViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
+        // 🟢 อัปเดตเข็มทิศให้ UI ของตัวเองทันทีแบบเรียลไทม์ (เพื่อให้เรดาร์หมุนสมูท)
+        locationService.headingPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] heading in
+                guard let self = self else { return }
+                self.updateMember(id: self.p2pService.myPeerId, location: nil, heading: heading)
+            }
+            .store(in: &cancellables)
+            
+        // 🟢 ส่งข้อมูลเข็มทิศให้เพื่อนผ่าน P2P เฉพาะทุกๆ 1 วินาทีเพื่อประหยัดแบนด์วิธ
         locationService.headingPublisher
             .throttle(for: .seconds(1.0), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] heading in
                 guard let self = self, let location = self.locationService.currentLocation else { return }
                 self.sendMyLocation(location: location, heading: heading)
-                self.updateMember(id: self.p2pService.myPeerId, location: nil, heading: heading)
             }
             .store(in: &cancellables)
+    }
+    
+    // 🟢 Reconnection handler
+    private func handleConnectionChange(peers: [MCPeerID]) {
+        guard isAdventureStarted else { return }
+        
+        if peers.isEmpty {
+            // Signal dropped, trigger reconnection
+            p2pService.isReconnecting = true
+            if amIHost {
+                p2pService.startHosting()
+            } else {
+                p2pService.startBrowsing()
+            }
+        } else if p2pService.isReconnecting {
+            // Reconnected successfully
+            p2pService.isReconnecting = false
+            if !amIHost {
+                p2pService.stopBrowsing()
+            }
+            shareProfileImage()
+        }
     }
     
     @MainActor private func shareProfileImage() {
@@ -104,6 +162,7 @@ class RoomViewModel: ObservableObject {
     func join(peer: MCPeerID) { p2pService.invitePeer(peer) }
     func acceptInvitation() { p2pService.acceptInvitation() }
     func declineInvitation() { p2pService.declineInvitation() }
+    func resetSessionForRetry() { p2pService.resetSessionForRetry() }
     
     // 🟢 เพิ่มฟังก์ชันที่หายไปกลับมาให้ครบ
     func leaveRoom(source: String = "Unknown") {
@@ -120,6 +179,11 @@ class RoomViewModel: ObservableObject {
     }
     
     func startAdventure() {
+        // 🟢 Store peer names for reconnection
+        var knownNames = Set(connectedPeers.map { $0.displayName })
+        knownNames.insert(p2pService.myPeerId.displayName)
+        p2pService.knownPeerNames = knownNames
+        
         let payload = P2PPayload(type: .startAdventure, senderName: p2pService.myPeerId.displayName, lat: nil, lng: nil, heading: nil, imageData: nil)
         if let data = try? JSONEncoder().encode(payload) {
             p2pService.broadcast(data: data, mode: .reliable)
@@ -143,6 +207,13 @@ class RoomViewModel: ObservableObject {
                 case .startAdventure:
                     let generator = UINotificationFeedbackGenerator(); generator.notificationOccurred(.success)
                     self?.isAdventureStarted = true; self?.tripStartTime = Date()
+                    // 🟢 Snapshot known peers for members too
+                    if let connected = self?.connectedPeers, let myId = self?.p2pService.myPeerId.displayName {
+                        var names = Set(connected.map { $0.displayName })
+                        names.insert(myId)
+                        names.insert(peer.displayName) // The host
+                        self?.p2pService.knownPeerNames = names
+                    }
                 case .endAdventure:
                     let generator = UINotificationFeedbackGenerator(); generator.notificationOccurred(.success)
                     self?.showTripSummary = true
@@ -152,7 +223,16 @@ class RoomViewModel: ObservableObject {
                 case .profileImage:
                     if let imgData = payload.imageData, let image = UIImage(data: imgData) { self?.updateMember(id: peer, image: image) }
                 case .sos:
+                    let generator = UINotificationFeedbackGenerator(); generator.notificationOccurred(.error)
                     self?.sosIncomingFrom = payload.senderName
+                    self?.latestSOSPeerName = payload.senderName
+                    self?.sosActivePeers.insert(peer)
+                    self?.showSOSReceivedAlert = true
+                    
+                    // 🟢 Auto clear after 60 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 60.0) {
+                        self?.sosActivePeers.remove(peer)
+                    }
                 }
             }
         }
@@ -199,13 +279,4 @@ class RoomViewModel: ObservableObject {
         return bearing - locationService.safeHeading
     }
     
-    // MARK: - Invitation Alerts
-        var showInvitationAlert: Bool {
-            get { (p2pService as? MultipeerSessionManager)?.showInvitationAlert ?? false }
-            set { (p2pService as? MultipeerSessionManager)?.showInvitationAlert = newValue }
-        }
-        
-        var pendingInvitationPeerName: String {
-            (p2pService as? MultipeerSessionManager)?.pendingInvitationPeerName ?? ""
-        }
 }

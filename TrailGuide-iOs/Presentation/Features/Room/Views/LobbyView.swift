@@ -61,18 +61,6 @@ struct LobbyView: View {
                 Button("ยกเลิกกลุ่ม (สมาชิกทั้งหมดจะหลุด)", role: .destructive) { viewModel.leaveRoom(source: "LobbyView - ยกเลิกกลุ่ม") }
                 Button("ปิด", role: .cancel) {}
             }
-            .alert(
-                "\(viewModel.pendingInvitationPeerName) ขอเข้าร่วมกลุ่ม",
-                isPresented: Binding(
-                    get: { viewModel.showInvitationAlert },
-                    set: { viewModel.showInvitationAlert = $0 }
-                )
-            ) {
-                Button("ยอมรับ") { viewModel.acceptInvitation() }
-                Button("ปฏิเสธ") { viewModel.declineInvitation() }
-            } message: {
-                Text("คุณต้องการอนุญาตให้บุคคลนี้เข้าร่วมการติดตามเรดาร์หรือไม่?")
-            }
         }
     }
 

@@ -14,7 +14,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyBest
         manager.distanceFilter = 5 // อัปเดตทุกๆ 5 เมตร เพื่อประหยัดแบตและลด Noise
-        manager.headingFilter = 5 // อัปเดตเข็มทิศเมื่อหันเกิน 5 องศา
+        manager.headingFilter = 1 // 🟢 เปลี่ยนให้ตอบสนองไวขึ้น (ทุกๆ 1 องศา) เพื่อให้เรดาร์หมุนได้สมูทไม่กระตุก
     }
     
     // 🟢 ฟังก์ชันขอสิทธิ์ (requestPermission)

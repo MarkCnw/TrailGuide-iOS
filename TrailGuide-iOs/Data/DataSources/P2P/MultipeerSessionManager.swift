@@ -12,12 +12,13 @@ class MultipeerSessionManager: NSObject, ObservableObject {
     var browser: MCNearbyServiceBrowser?
     
     @Published var connectedPeers: [MCPeerID] = []
-    @Published var showInvitationAlert: Bool = false
-    private(set) var pendingInvitationPeerName: String = ""
-    private var pendingInvitationHandler: ((Bool, MCSession?) -> Void)?
     
     @Published var availablePeers: [MCPeerID] = []
     @Published var lastConnectionError: MCPeerID? = nil
+    
+    // 🟢 Auto Reconnect state
+    var knownPeerNames: Set<String> = []
+    @Published var isReconnecting: Bool = false
     
     private var browseRetryTimer: Timer?
     private var isCurrentlyBrowsing: Bool = false
@@ -93,24 +94,11 @@ class MultipeerSessionManager: NSObject, ObservableObject {
     }
     
     func invitePeer(_ peer: MCPeerID) {
-        browser?.invitePeer(peer, to: session, withContext: nil, timeout: 30)
+        browser?.invitePeer(peer, to: session, withContext: nil, timeout: 15) // 🟢 ลด timeout เหลือ 15 วินาที
     }
     
-    func acceptInvitation() {
-        guard let handler = pendingInvitationHandler else { return }
-        handler(true, session)
-        pendingInvitationHandler = nil
-        pendingInvitationPeerName = ""
-        showInvitationAlert = false
-    }
-    
-    func declineInvitation() {
-        guard let handler = pendingInvitationHandler else { return }
-        handler(false, nil)
-        pendingInvitationHandler = nil
-        pendingInvitationPeerName = ""
-        showInvitationAlert = false
-    }
+    func acceptInvitation() {}
+    func declineInvitation() {}
     
     func broadcast(data: Data, mode: MCSessionSendDataMode = .reliable) {
         guard !session.connectedPeers.isEmpty else { return }
@@ -121,14 +109,31 @@ class MultipeerSessionManager: NSObject, ObservableObject {
     func disconnect() {
         stopHosting()
         stopBrowsing()
-        session.disconnect()
+        
+        // 🟢 ไม่ disconnect session ถ้ากำลัง reconnect
+        if !isReconnecting {
+            session.disconnect()
+            knownPeerNames.removeAll()
+        }
+        
         DispatchQueue.main.async {
             self.connectedPeers.removeAll()
             self.availablePeers.removeAll()
             self.lastConnectionError = nil
-            self.showInvitationAlert = false
-            self.pendingInvitationHandler = nil
-            self.pendingInvitationPeerName = ""
+        }
+        
+        if !isReconnecting {
+            self.session = MCSession(peer: self.myPeerId, securityIdentity: nil, encryptionPreference: .none)
+            self.session.delegate = self
+        }
+    }
+    
+    // 🟢 ล้าง Session ทิ้งกรณีการเชื่อมต่อค้างหรือถูกปฏิเสธ เพื่อสร้างท่อใหม่ที่สะอาด
+    func resetSessionForRetry() {
+        session.disconnect()
+        DispatchQueue.main.async {
+            self.lastConnectionError = nil
+            self.connectedPeers.removeAll()
         }
         self.session = MCSession(peer: self.myPeerId, securityIdentity: nil, encryptionPreference: .none)
         self.session.delegate = self
@@ -163,12 +168,8 @@ extension MultipeerSessionManager: MCSessionDelegate {
 
 extension MultipeerSessionManager: MCNearbyServiceAdvertiserDelegate {
     func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID, withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
-        DispatchQueue.main.async {
-            if let oldHandler = self.pendingInvitationHandler { oldHandler(false, nil) }
-            self.pendingInvitationPeerName = peerID.displayName
-            self.pendingInvitationHandler = invitationHandler
-            self.showInvitationAlert = true
-        }
+        // 🟢 Auto-accept all peers (เข้าร่วมอัตโนมัติ 100%)
+        invitationHandler(true, session)
     }
     func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didNotStartAdvertisingPeer error: Error) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
@@ -202,5 +203,6 @@ extension MultipeerSessionManager: P2PServiceProtocol {
     var availablePeersPublisher: AnyPublisher<[MCPeerID], Never> { $availablePeers.eraseToAnyPublisher() }
     var lastConnectionErrorPublisher: AnyPublisher<MCPeerID?, Never> { $lastConnectionError.eraseToAnyPublisher() }
     var connectedPeersPublisher: AnyPublisher<[MCPeerID], Never> { $connectedPeers.eraseToAnyPublisher() }
+    var isReconnectingPublisher: AnyPublisher<Bool, Never> { $isReconnecting.eraseToAnyPublisher() }
     var objectWillChangePublisher: AnyPublisher<Void, Never> { objectWillChange.map { _ in () }.eraseToAnyPublisher() }
 }

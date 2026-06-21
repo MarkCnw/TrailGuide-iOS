@@ -14,7 +14,8 @@ struct TrailGuideApp: App {
         
         // 🟢 2. เปิดใช้งานกล่องฐานข้อมูล (SwiftData) ตั้งแต่ตอนแอปเริ่มรัน
         do {
-            sharedModelContainer = try ModelContainer(for: UserProfileSchema.self)
+            // 👇 เติม TripHistoryModel.self เข้าไปตรงนี้ครับ!
+            sharedModelContainer = try ModelContainer(for: UserProfileSchema.self, TripHistoryModel.self)
         } catch {
             fatalError("ไม่สามารถสร้างฐานข้อมูลได้: \(error)")
         }

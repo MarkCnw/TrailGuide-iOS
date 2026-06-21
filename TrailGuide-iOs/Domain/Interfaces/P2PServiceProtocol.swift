@@ -13,6 +13,13 @@ protocol P2PServiceProtocol {
     
     var onDataReceived: ((Data, MCPeerID) -> Void)? { get set }
     
+    /// ชื่อเพื่อนที่เคยเชื่อมต่อแล้ว — ใช้ auto-accept เมื่อ reconnect
+    var knownPeerNames: Set<String> { get set }
+    
+    /// สถานะว่ากำลังพยายามเชื่อมต่อใหม่หรือไม่
+    var isReconnecting: Bool { get set }
+    var isReconnectingPublisher: AnyPublisher<Bool, Never> { get }
+    
     func startHosting()
     func stopHosting()
     func startBrowsing()
@@ -22,6 +29,9 @@ protocol P2PServiceProtocol {
     func declineInvitation()
     func broadcast(data: Data, mode: MCSessionSendDataMode)
     func disconnect()
+    
+    // 🟢 สำหรับเคลียร์ Session ผีสิง (Ghost Session) ตอน Join พลาด
+    func resetSessionForRetry()
     
     // 🟢 เพิ่มตัวนี้สำหรับเปลี่ยนชื่อ
     func updateUsername(_ name: String)
