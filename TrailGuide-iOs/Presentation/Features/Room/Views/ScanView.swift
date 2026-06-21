@@ -1,93 +1,138 @@
 import SwiftUI
 import MultipeerConnectivity
 
-
-
 struct ScanView: View {
-    @StateObject var viewModel: RoomViewModel
+    @ObservedObject var viewModel: RoomViewModel
     @Environment(\.dismiss) var dismiss
     
+    @State private var joiningPeer: MCPeerID? = nil
+    @State private var rejectedPeer: MCPeerID? = nil
+    @State private var joinTimer: Timer? = nil
+
     var body: some View {
         NavigationStack {
-            VStack {
-                // ส่วนของเรดาร์จำลอง
+            VStack(spacing: 32) {
+                Spacer()
                 ZStack {
-                    Circle()
-                        .stroke(Color.green.opacity(0.2), lineWidth: 1)
-                        .frame(width: 200, height: 200)
-                    
-                    Circle()
-                        .stroke(Color.green.opacity(0.3), lineWidth: 1)
-                        .frame(width: 150, height: 150)
-                    
-                    Image(systemName: "location.magnifyingglass")
-                        .font(.system(size: 40))
+                    Circle().stroke(Color.green.opacity(0.3), lineWidth: 2).frame(width: 200, height: 200)
+                    Image(systemName: "location.viewfinder")
+                        .font(.system(size: 60))
                         .foregroundColor(.green)
+                        .symbolEffect(.pulse.byLayer, options: .repeating)
                 }
-                .padding(.top, 40)
                 
-                Text("กำลังค้นหาหัวหน้าทริป...")
-                    .font(.headline)
-                    .padding(.top, 20)
+                Text("กำลังค้นหาหัวหน้าทริป...").font(.headline)
                 
-                // ลิสต์รายชื่อ Host ที่สแกนเจอ
-                List {
-                    Section(header: Text("กลุ่มที่พบใกล้ตัว")) {
-                        if viewModel.sessionManager.availablePeers.isEmpty {
-                            HStack {
-                                Spacer()
-                                ProgressView()
-                                Text(" ค้นหาอยู่...")
-                                    .foregroundColor(.gray)
-                                Spacer()
-                            }
-                            .listRowBackground(Color.clear)
-                        } else {
-                            ForEach(viewModel.sessionManager.availablePeers, id: \.self) { peer in
-                                Button(action: {
-                                    viewModel.join(peer: peer)
-                                }) {
-                                    HStack {
-                                        VStack(alignment: .leading) {
-                                            Text(peer.displayName)
-                                                .fontWeight(.bold)
-                                            Text("กดเพื่อขอเข้าร่วมกลุ่ม")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .font(.caption)
-                                            .foregroundColor(.gray)
-                                    }
-                                }
-                                .foregroundColor(.primary)
-                            }
+                VStack(alignment: .leading) {
+                    Text("พบหัวหน้าทริป (\(viewModel.availablePeers.count))")
+                        .font(.subheadline).foregroundColor(.secondary).padding(.horizontal)
+                    
+                    ScrollView {
+                        ForEach(viewModel.availablePeers, id: \.self) { peer in
+                            peerRow(for: peer)
                         }
                     }
                 }
+                Spacer()
             }
-            .navigationTitle("ค้นหากลุ่ม")
+            // 🟢 1. เทสีพื้นหลังให้เต็มขอบจอ เพื่อให้สีกลืนกับแอปทั้งหมด
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
+            .navigationTitle("สแกนหาเพื่อน")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("ปิด") {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("ยกเลิก") {
                         viewModel.stopBrowsing()
                         dismiss()
                     }
                 }
             }
-            .onAppear {
-                viewModel.startBrowsing() // 🟢 เริ่มสแกนทันทีที่เปิดหน้า
-            }
-            .onDisappear {
-                viewModel.stopBrowsing() // 🔴 หยุดสแกนเมื่อปิดหน้า
-            }
-            // เมื่อเชื่อมต่อสำเร็จ ให้เด้งไปหน้า Lobby (ถ้าต้องการ) หรือจัดการสถานะต่อ
-            .onChange(of: viewModel.sessionManager.connectedPeers) { oldValue, newValue in
-                if !newValue.isEmpty {
-                    // เชื่อมต่อติดแล้ว! (ในที่นี้เราอาจจะจัดการผ่าน State เพื่อเปลี่ยน View)
+            .onAppear { viewModel.startBrowsing() }
+            .onDisappear { 
+                viewModel.stopBrowsing()
+                if joiningPeer != nil {
+                    // 🟢 ผู้ใช้กดยกเลิกขณะกำลังเชื่อมต่อ ล้าง session ทิ้งเพื่อป้องกัน ghost session
+                    viewModel.resetSessionForRetry()
                 }
+                joinTimer?.invalidate()
+            }
+            .onChange(of: viewModel.connectedPeers) { _, newValue in
+                // 🟢 2. เอาการเรียก MemberLobbyView ซ้อนออก เพราะเดี๋ยว RadarPageView สั่งปิด Sheet ให้เอง
+                if !newValue.isEmpty {
+                    joinTimer?.invalidate()
+                    joiningPeer = nil
+                    rejectedPeer = nil
+                }
+            }
+            .onChange(of: viewModel.lastConnectionError) { _, errorPeer in
+                if let peer = errorPeer, joiningPeer == peer {
+                    handleRejection(for: peer)
+                }
+            }
+        }
+        // 🟢 3. สำหรับ iOS 16.4+ บังคับให้ตัว Sheet คุมโทนสีให้มิดชิด
+        .presentationBackground(Color(.systemGroupedBackground))
+    }
+    
+    // MARK: - Helper Views
+    private func peerRow(for peer: MCPeerID) -> some View {
+        Button(action: {
+            viewModel.lastConnectionError = nil
+            rejectedPeer = nil
+            joiningPeer = peer
+            
+            viewModel.join(peer: peer)
+            
+            // 🟢 ตั้งเวลา 15 วินาที ถ้าไม่เชื่อมต่อให้แจ้ง "ล้มเหลว/หมดเวลา"
+            joinTimer?.invalidate()
+            joinTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: false) { _ in
+                if self.joiningPeer == peer && self.viewModel.connectedPeers.isEmpty {
+                    self.handleRejection(for: peer)
+                }
+            }
+        }) {
+            HStack {
+                Text(peer.displayName).font(.headline).foregroundColor(.primary)
+                Spacer()
+                
+                if joiningPeer == peer {
+                    ProgressView()
+                } else if rejectedPeer == peer {
+                    Text("ล้มเหลว") // 🟢 เปลี่ยนคำให้ครอบคลุมทั้ง ถูกปฏิเสธ / หมดเวลา
+                        .font(.subheadline).fontWeight(.bold).foregroundColor(.red)
+                } else {
+                    Text("เข้าร่วม")
+                        .fontWeight(.bold).foregroundColor(.white)
+                        .padding(.horizontal).padding(.vertical, 8)
+                        .background(Color.green).cornerRadius(20)
+                }
+            }
+            .padding()
+            // 🟢 4. ปรับสีการ์ดให้สว่างขึ้นมานิดนึง จะได้ตัดกับสีพื้นหลังอย่างสวยงาม
+            .background(Color(.secondarySystemGroupedBackground))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(rejectedPeer == peer ? Color.red.opacity(0.5) : Color.clear, lineWidth: 1)
+            )
+        }
+        .disabled(joiningPeer != nil || rejectedPeer == peer)
+        .padding(.horizontal).padding(.bottom, 8)
+    }
+    
+    // MARK: - Logic
+    private func handleRejection(for peer: MCPeerID) {
+        joinTimer?.invalidate()
+        joiningPeer = nil
+        rejectedPeer = peer
+        viewModel.lastConnectionError = nil
+        
+        // 🟢 รีเซ็ต MCSession ทิ้งเพื่อป้องกัน Bug เข้าร่วมไม่ได้ในครั้งหน้า
+        viewModel.resetSessionForRetry()
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            if self.rejectedPeer == peer {
+                self.rejectedPeer = nil
             }
         }
     }

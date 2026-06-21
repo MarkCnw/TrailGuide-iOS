@@ -2,13 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSBonjourServices</key>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>TrailGuide ต้องการเข้าถึงตำแหน่งของคุณเพื่อแสดงตำแหน่งบนเรดาร์และแชร์ให้เพื่อนร่วมทริป</string>
     <key>NSLocalNetworkUsageDescription</key>
-        <string>TrailGuide ต้องการใช้ Local Network และ Bluetooth เพื่อค้นหาเพื่อนนักเดินทางรอบตัวคุณ</string>
-        <key>NSBonjourServices</key>
-	<array>
-		<string>_trail-p2p._tcp</string>
-		<string>_trail-p2p._udp</string>
-	</array>
+    <string>TrailGuide ต้องการใช้ Local Network และ Bluetooth เพื่อค้นหาเพื่อนนักเดินทางรอบตัวคุณ</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_trailguide-p2p._tcp</string>
+        <string>_trailguide-p2p._udp</string>
+    </array>
 </dict>
 </plist>

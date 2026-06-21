@@ -3,149 +3,206 @@ import MultipeerConnectivity
 import Combine
 
 class MultipeerSessionManager: NSObject, ObservableObject {
+    private let serviceType = "trailguide-p2p"
     
-    // ==========================================
-    // 🟢 เสาหลักที่ 1: การตั้งชื่อและระบุตัวตน (Identity & Session)
-    // ==========================================
-    private let serviceType = "trail-p2p" // รหัสประจำแอป (ห้ามเกิน 15 ตัวอักษร พิมพ์เล็กทั้งหมด)
-    private let myPeerId: MCPeerID
-    private(set) var session: MCSession
+    // 🟢 เปลี่ยนจาก let เป็น private(set) var เพื่อให้เปลี่ยนชื่อได้
+    private(set) var myPeerId: MCPeerID
+    private(set) var session: MCSession!
+    var advertiser: MCNearbyServiceAdvertiser?
+    var browser: MCNearbyServiceBrowser?
     
-    // ตัวแปรสำหรับปล่อยและค้นหาสัญญาณ
-    private var advertiser: MCNearbyServiceAdvertiser?
-    private var browser: MCNearbyServiceBrowser?
+    @Published var connectedPeers: [MCPeerID] = []
     
-    // ตัวแปรสำหรับส่งข้อมูลไปโชว์ที่หน้าจอ (UI) ทันทีที่มีการเปลี่ยนแปลง
-    @Published var connectedPeers: [MCPeerID] = [] // รายชื่อเพื่อนที่เชื่อมต่อสำเร็จ (อยู่ใน Lobby)
-    @Published var availablePeers: [MCPeerID] = [] // รายชื่อ Host ที่สแกนเจอ (เอาไว้โชว์ใน ScanView)
+    @Published var availablePeers: [MCPeerID] = []
+    @Published var lastConnectionError: MCPeerID? = nil
+    
+    // 🟢 Auto Reconnect state
+    var knownPeerNames: Set<String> = []
+    @Published var isReconnecting: Bool = false
+    
+    private var browseRetryTimer: Timer?
+    private var isCurrentlyBrowsing: Bool = false
+    private var isCurrentlyHosting: Bool = false
+    
+    var onDataReceived: ((Data, MCPeerID) -> Void)?
     
     init(username: String) {
-        // 1. สร้างตัวตนจากชื่อผู้ใช้
-        self.myPeerId = MCPeerID(displayName: username)
-        
-        // 2. สร้างห้องแชท (Session)
-        self.session = MCSession(peer: myPeerId, securityIdentity: nil, encryptionPreference: .required)
+        if let data = UserDefaults.standard.data(forKey: "saved_peer_id"),
+           let savedPeerID = try? NSKeyedUnarchiver.unarchivedObject(ofClass: MCPeerID.self, from: data),
+           savedPeerID.displayName == username {
+            self.myPeerId = savedPeerID
+        } else {
+            let newPeerID = MCPeerID(displayName: username)
+            self.myPeerId = newPeerID
+            if let data = try? NSKeyedArchiver.archivedData(withRootObject: newPeerID, requiringSecureCoding: true) {
+                UserDefaults.standard.set(data, forKey: "saved_peer_id")
+            }
+        }
         
         super.init()
-        
-        // 3. ตั้งค่าให้คลาสนี้เป็นคนคอยรับฟังสถานะของห้องแชท
+        self.session = MCSession(peer: self.myPeerId, securityIdentity: nil, encryptionPreference: .none)
         self.session.delegate = self
     }
     
-    // ==========================================
-    // 🟢 เสาหลักที่ 2: โหมดหัวหน้าทริป (Host / Advertiser)
-    // ==========================================
+    // MARK: - Actions
     func startHosting() {
+        advertiser?.stopAdvertisingPeer()
+        advertiser = nil
         advertiser = MCNearbyServiceAdvertiser(peer: myPeerId, discoveryInfo: nil, serviceType: serviceType)
         advertiser?.delegate = self
         advertiser?.startAdvertisingPeer()
-        print("📡 Host: กำลังปล่อยสัญญาณ...")
+        isCurrentlyHosting = true
     }
     
     func stopHosting() {
+        isCurrentlyHosting = false
         advertiser?.stopAdvertisingPeer()
-        print("📡 Host: หยุดปล่อยสัญญาณ")
+        advertiser = nil
     }
     
-    // ==========================================
-    // 🟢 เสาหลักที่ 3: โหมดลูกทริป (Member / Browser)
-    // ==========================================
     func startBrowsing() {
-        availablePeers.removeAll() // ล้างรายชื่อเก่าก่อนสแกนใหม่
+        browser?.stopBrowsingForPeers()
+        browser = nil
+        browseRetryTimer?.invalidate()
+        browseRetryTimer = nil
+        
+        DispatchQueue.main.async {
+            self.availablePeers.removeAll()
+            self.lastConnectionError = nil
+        }
+        
         browser = MCNearbyServiceBrowser(peer: myPeerId, serviceType: serviceType)
         browser?.delegate = self
         browser?.startBrowsingForPeers()
-        print("🔍 Member: กำลังค้นหาหัวหน้าทริปใกล้เคียง...")
+        isCurrentlyBrowsing = true
+        
+        browseRetryTimer = Timer.scheduledTimer(withTimeInterval: 8.0, repeats: true) { [weak self] _ in
+            guard let self = self, self.isCurrentlyBrowsing else { return }
+            if self.availablePeers.isEmpty && self.connectedPeers.isEmpty {
+                self.browser?.stopBrowsingForPeers()
+                self.browser?.startBrowsingForPeers()
+            }
+        }
     }
     
     func stopBrowsing() {
+        isCurrentlyBrowsing = false
+        browseRetryTimer?.invalidate()
+        browseRetryTimer = nil
         browser?.stopBrowsingForPeers()
-        availablePeers.removeAll()
-        print("🔍 Member: หยุดค้นหา")
+        browser = nil
     }
     
-    // สั่งส่งคำเชิญไปหา Host ที่เลือก
     func invitePeer(_ peer: MCPeerID) {
-        print("✉️ Member: กำลังส่งคำขอเข้าร่วมกลุ่มไปหา \(peer.displayName)")
-        browser?.invitePeer(peer, to: session, withContext: nil, timeout: 30)
+        browser?.invitePeer(peer, to: session, withContext: nil, timeout: 15) // 🟢 ลด timeout เหลือ 15 วินาที
     }
     
-    // ตัดการเชื่อมต่อทั้งหมดและออกจากกลุ่ม
+    func acceptInvitation() {}
+    func declineInvitation() {}
+    
+    func broadcast(data: Data, mode: MCSessionSendDataMode = .reliable) {
+        guard !session.connectedPeers.isEmpty else { return }
+        do { try session.send(data, toPeers: session.connectedPeers, with: mode) }
+        catch { print("❌ ส่งข้อมูลไม่สำเร็จ: \(error.localizedDescription)") }
+    }
+    
     func disconnect() {
         stopHosting()
         stopBrowsing()
+        
+        // 🟢 ไม่ disconnect session ถ้ากำลัง reconnect
+        if !isReconnecting {
+            session.disconnect()
+            knownPeerNames.removeAll()
+        }
+        
+        DispatchQueue.main.async {
+            self.connectedPeers.removeAll()
+            self.availablePeers.removeAll()
+            self.lastConnectionError = nil
+        }
+        
+        if !isReconnecting {
+            self.session = MCSession(peer: self.myPeerId, securityIdentity: nil, encryptionPreference: .none)
+            self.session.delegate = self
+        }
+    }
+    
+    // 🟢 ล้าง Session ทิ้งกรณีการเชื่อมต่อค้างหรือถูกปฏิเสธ เพื่อสร้างท่อใหม่ที่สะอาด
+    func resetSessionForRetry() {
         session.disconnect()
-        connectedPeers.removeAll()
-        availablePeers.removeAll()
-    }
-}
-
-// ==========================================
-// 🟢 เสาหลักที่ 2 (ภาคต่อ): ดักฟังคำขอฝั่ง Host
-// ==========================================
-extension MultipeerSessionManager: MCNearbyServiceAdvertiserDelegate {
-    func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID, withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
-        print("📥 Host: ได้รับคำขอเข้าร่วมจาก \(peerID.displayName)")
-        // กดยอมรับลูกทริปอัตโนมัติ (true) และดึงเข้ามาใน Session
-        invitationHandler(true, self.session)
-    }
-}
-
-// ==========================================
-// 🟢 เสาหลักที่ 3 (ภาคต่อ): ดักฟังการสแกนเจอ Host
-// ==========================================
-extension MultipeerSessionManager: MCNearbyServiceBrowserDelegate {
-    func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String : String]?) {
-        print("🎯 Member: สแกนพบหัวหน้าทริปชื่อ \(peerID.displayName)")
         DispatchQueue.main.async {
-            // ถ้ายืนยันว่ายังไม่มีชื่อนี้ในลิสต์ ให้เพิ่มเข้าไป
-            if !self.availablePeers.contains(peerID) {
-                self.availablePeers.append(peerID)
-            }
+            self.lastConnectionError = nil
+            self.connectedPeers.removeAll()
         }
+        self.session = MCSession(peer: self.myPeerId, securityIdentity: nil, encryptionPreference: .none)
+        self.session.delegate = self
     }
     
-    func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
-        print("❌ Member: สัญญาณของ \(peerID.displayName) หายไป")
-        DispatchQueue.main.async {
-            self.availablePeers.removeAll(where: { $0 == peerID })
+    // 🟢 ฟังก์ชันอัปเดตชื่อผู้ใช้
+    func updateUsername(_ newName: String) {
+        disconnect()
+        let newPeerID = MCPeerID(displayName: newName)
+        self.myPeerId = newPeerID
+        if let data = try? NSKeyedArchiver.archivedData(withRootObject: newPeerID, requiringSecureCoding: true) {
+            UserDefaults.standard.set(data, forKey: "saved_peer_id")
         }
+        self.session = MCSession(peer: self.myPeerId, securityIdentity: nil, encryptionPreference: .none)
+        self.session.delegate = self
+        objectWillChange.send()
     }
 }
 
-// ==========================================
-// 🟢 เสาหลักที่ 4: นักสืบสถานะห้องแชท (Session Delegate)
-// ==========================================
 extension MultipeerSessionManager: MCSessionDelegate {
-    
-    // สังเกตสถานะการเชื่อมต่อ (ติด/กำลังเชื่อม/หลุด)
     func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
         DispatchQueue.main.async {
-            switch state {
-            case .connected:
-                print("✅ Session: เชื่อมต่อกับ \(peerID.displayName) สำเร็จ!")
-                if !self.connectedPeers.contains(peerID) {
-                    self.connectedPeers.append(peerID)
-                }
-            case .notConnected:
-                print("🔴 Session: หลุดการเชื่อมต่อกับ \(peerID.displayName)")
-                self.connectedPeers.removeAll(where: { $0 == peerID })
-            case .connecting:
-                print("⏳ Session: กำลังเชื่อมต่อกับ \(peerID.displayName)...")
-            @unknown default:
-                break
-            }
+            self.connectedPeers = session.connectedPeers
+            if state == .notConnected { self.lastConnectionError = peerID }
         }
     }
-    
-    // รับข้อมูล (Data) ที่ส่งหากันในกลุ่ม
-    func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
-        print("💬 Session: ได้รับข้อมูลจาก \(peerID.displayName)")
-        // TODO: เตรียมไว้สำหรับแปลง Data เป็นข้อความ SOS หรือ พิกัด GPS ในอนาคต
-    }
-    
-    // --- ฟังก์ชันบังคับของ Protocol (ใส่ไว้ให้ระบบไม่ Error แต่แอปเรายังไม่ได้ใช้) ---
+    func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) { onDataReceived?(data, peerID) }
     func session(_ session: MCSession, didReceive stream: InputStream, withName streamName: String, fromPeer peerID: MCPeerID) {}
     func session(_ session: MCSession, didStartReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, with progress: Progress) {}
     func session(_ session: MCSession, didFinishReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, at localURL: URL?, withError error: Error?) {}
+}
+
+extension MultipeerSessionManager: MCNearbyServiceAdvertiserDelegate {
+    func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID, withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
+        // 🟢 Auto-accept all peers (เข้าร่วมอัตโนมัติ 100%)
+        invitationHandler(true, session)
+    }
+    func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didNotStartAdvertisingPeer error: Error) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            guard let self = self, self.isCurrentlyHosting else { return }
+            self.advertiser?.stopAdvertisingPeer()
+            self.advertiser?.startAdvertisingPeer()
+        }
+    }
+}
+
+extension MultipeerSessionManager: MCNearbyServiceBrowserDelegate {
+    func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String : String]?) {
+        guard peerID != self.myPeerId else { return }
+        DispatchQueue.main.async {
+            if !self.availablePeers.contains(peerID) { self.availablePeers.append(peerID) }
+        }
+    }
+    func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
+        DispatchQueue.main.async { self.availablePeers.removeAll(where: { $0 == peerID }) }
+    }
+    func browser(_ browser: MCNearbyServiceBrowser, didNotStartBrowsingForPeers error: Error) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            guard let self = self, self.isCurrentlyBrowsing else { return }
+            self.browser?.stopBrowsingForPeers()
+            self.browser?.startBrowsingForPeers()
+        }
+    }
+}
+
+extension MultipeerSessionManager: P2PServiceProtocol {
+    var availablePeersPublisher: AnyPublisher<[MCPeerID], Never> { $availablePeers.eraseToAnyPublisher() }
+    var lastConnectionErrorPublisher: AnyPublisher<MCPeerID?, Never> { $lastConnectionError.eraseToAnyPublisher() }
+    var connectedPeersPublisher: AnyPublisher<[MCPeerID], Never> { $connectedPeers.eraseToAnyPublisher() }
+    var isReconnectingPublisher: AnyPublisher<Bool, Never> { $isReconnecting.eraseToAnyPublisher() }
+    var objectWillChangePublisher: AnyPublisher<Void, Never> { objectWillChange.map { _ in () }.eraseToAnyPublisher() }
 }

@@ -2,84 +2,99 @@ import SwiftUI
 import MultipeerConnectivity
 
 struct LobbyView: View {
-    @StateObject var viewModel: RoomViewModel
-    @Environment(\.dismiss) var dismiss
-    
+    @ObservedObject var viewModel: RoomViewModel
+    @State private var showCancelConfirm = false
+
     var body: some View {
         NavigationStack {
-            VStack {
-                // ส่วนหัวแสดงสถานะ
-                VStack(spacing: 12) {
-                    Image(systemName: "antenna.radiowaves.left.and.right")
-                        .font(.system(size: 50))
-                        .foregroundColor(.blue)
-                        .symbolEffect(.variableColor.iterative, options: .repeating)
-                    
-                    Text("กำลังเปิดห้องพักคอย...")
-                        .font(.headline)
-                    
-                    Text("รอเพื่อนนักเดินทางกดเข้าร่วมกลุ่มของคุณ")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.vertical, 30)
-                
-                // รายชื่อสมาชิกในกลุ่ม
-                List {
-                    Section(header: Text("สมาชิกในกลุ่ม (\(viewModel.sessionManager.connectedPeers.count))")) {
-                        if viewModel.sessionManager.connectedPeers.isEmpty {
-                            Text("ยังไม่มีใครเข้าร่วม...")
-                                .foregroundColor(.gray)
-                                .italic()
-                        } else {
-                            ForEach(viewModel.sessionManager.connectedPeers, id: \.self) { peer in
-                                HStack {
-                                    Image(systemName: "person.circle.fill")
-                                        .foregroundColor(.blue)
-                                    Text(peer.displayName)
-                                        .fontWeight(.medium)
-                                    Spacer()
-                                    Text("เชื่อมต่อแล้ว")
-                                        .font(.caption)
-                                        .foregroundColor(.green)
-                                }
-                            }
+            List {
+                Section {
+                    VStack(spacing: 16) {
+                        ZStack {
+                            Circle().fill(Color.blue.opacity(0.1)).frame(width: 80, height: 80)
+                            Image(systemName: "antenna.radiowaves.left.and.right")
+                                .font(.system(size: 36)).foregroundColor(.blue)
+                                .symbolEffect(.variableColor.iterative, options: .repeating)
                         }
+                        .padding(.top, 8)
+                        
+                        Text("กำลังรอเพื่อนนักเดินทาง").font(.headline)
+                        Text("เพื่อนในระยะใกล้สามารถสแกนพบกลุ่มของคุณได้")
+                            .font(.subheadline).foregroundColor(.secondary).multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity).padding(.vertical, 8)
+                }
+                .listRowBackground(Color.clear)
+
+                Section(header: Text("สมาชิกในกลุ่ม (\(viewModel.allMembers.count))")) {
+                    ForEach(viewModel.allMembers, id: \.self) { peer in
+                        memberRow(for: peer)
                     }
                 }
-                
-                // ปุ่มเริ่มเดินทาง
-                Button(action: {
-                    // TODO: นำทางไปหน้าแผนที่และการติดตามตัว
-                    print("🚀 เริ่มการเดินทาง!")
-                }) {
-                    Text("เริ่มการเดินทาง")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(viewModel.sessionManager.connectedPeers.isEmpty ? Color.gray : Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
+
+                Section {
+                    Button(action: { viewModel.startAdventure() }) {
+                        HStack {
+                            Spacer()
+                            Label("เริ่มออกเดินทาง", systemImage: "figure.walk")
+                                .font(.headline).foregroundColor(.white)
+                            Spacer()
+                        }
+                        .padding(.vertical, 8)
+                    }
+                    .listRowBackground(RoundedRectangle(cornerRadius: 12).fill(viewModel.connectedPeers.isEmpty ? Color.gray : Color.green))
+                    .disabled(viewModel.connectedPeers.isEmpty)
+                } footer: {
+                    if viewModel.connectedPeers.isEmpty {
+                        Text("ต้องมีสมาชิกอย่างน้อย 1 คนเพื่อเริ่มการเดินทาง")
+                    }
                 }
-                .disabled(viewModel.sessionManager.connectedPeers.isEmpty)
-                .padding()
             }
-            .navigationTitle("ห้องพักคอย")
+            .navigationTitle("การเตรียมความพร้อม")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("ยกเลิก") {
-                        viewModel.leaveRoom()
-                        dismiss()
-                    }
+                    Button("ยกเลิกกลุ่ม", role: .destructive) { showCancelConfirm = true }
                 }
             }
-            .onAppear {
-                viewModel.startHosting() // 🟢 เริ่มปล่อยสัญญาณทันทีที่เปิดหน้านี้
-            }
-            .onDisappear {
-                viewModel.stopHosting() // 🔴 หยุดปล่อยสัญญาณเมื่อปิดหน้า
+            .confirmationDialog("คุณแน่ใจหรือไม่ที่จะยกเลิกกลุ่ม?", isPresented: $showCancelConfirm, titleVisibility: .visible) {
+                Button("ยกเลิกกลุ่ม (สมาชิกทั้งหมดจะหลุด)", role: .destructive) { viewModel.leaveRoom(source: "LobbyView - ยกเลิกกลุ่ม") }
+                Button("ปิด", role: .cancel) {}
             }
         }
+    }
+
+    @ViewBuilder
+    private func memberRow(for peer: MCPeerID) -> some View {
+        let isMe = peer == viewModel.allMembers.first
+        let isHost = viewModel.isHost(peer)
+        
+        HStack(spacing: 12) {
+            ZStack {
+                // 🟢 แก้จุดนี้: ดึงรูปจาก TrailMember แทน Dictionary เก่า
+                if let uiImage = viewModel.trailMembers[peer]?.profileImage {
+                    Image(uiImage: uiImage).resizable().scaledToFill().frame(width: 40, height: 40)
+                        .clipShape(Circle()).overlay(Circle().stroke(isHost ? Color.orange : Color.green, lineWidth: 1.5))
+                } else {
+                    Circle().fill(isHost ? Color.orange.opacity(0.1) : Color.green.opacity(0.1)).frame(width: 40, height: 40)
+                    Text(String(peer.displayName.prefix(1)).uppercased())
+                        .fontWeight(.bold).foregroundColor(isHost ? .orange : .green)
+                }
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text(peer.displayName).font(.headline)
+                    if isMe { Text("(คุณ)").font(.caption2).foregroundColor(.secondary) }
+                }
+                Text(isHost ? "หัวหน้าทริป" : "สมาชิก").font(.caption).foregroundColor(isHost ? .orange : .secondary)
+            }
+            Spacer()
+            if isHost {
+                Image(systemName: "crown.fill").foregroundColor(.orange).font(.caption)
+            } else {
+                Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
