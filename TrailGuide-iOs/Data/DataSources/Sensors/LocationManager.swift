@@ -15,11 +15,16 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         manager.desiredAccuracy = kCLLocationAccuracyBest
         manager.distanceFilter = 5 // อัปเดตทุกๆ 5 เมตร เพื่อประหยัดแบตและลด Noise
         manager.headingFilter = 1 // 🟢 เปลี่ยนให้ตอบสนองไวขึ้น (ทุกๆ 1 องศา) เพื่อให้เรดาร์หมุนได้สมูทไม่กระตุก
+        
+        manager.allowsBackgroundLocationUpdates = true
+        manager.showsBackgroundLocationIndicator = true
+        manager.pausesLocationUpdatesAutomatically = false
     }
     
     // 🟢 ฟังก์ชันขอสิทธิ์ (requestPermission)
     func requestPermission() {
-        manager.requestWhenInUseAuthorization()
+        
+        manager.requestAlwaysAuthorization()
     }
     
     // 🟢 ฟังก์ชันเริ่มดึงพิกัด (startUpdatingLocation)
@@ -44,11 +49,27 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     // Delegate เมื่อพิกัดเปลี่ยน
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
+        
+        // ==========================================
+        // 🛑 1. ด่านตรวจจับพิกัดมั่ว (Accuracy Filter)
+        // ==========================================
+        // ถ้า "รัศมีความมั่ว" มากกว่า 30 เมตร (หรือค่าติดลบที่แปลว่า GPS พัง)
+        if location.horizontalAccuracy > 30 || location.horizontalAccuracy < 0 {
+            // ปริ้นบอกตัวเองใน Xcode ว่าทิ้งจุดนี้ไปแล้ว
+            print("🗑️ ทิ้งพิกัดขยะ! (รัศมีความมั่วตั้ง \(location.horizontalAccuracy) เมตร)")
+            
+            // สั่ง return เพื่อ "เตะทิ้ง" และหยุดการทำงานทันที!
+            // (พิกัดนี้จะไม่ถูกส่งไปวาดเส้นสีน้ำเงินแน่นอน)
+            return
+        }
+        
+        // ==========================================
+        // ✅ 2. อัปเดตพิกัด (ถ้าผ่านด่านข้างบนมาได้)
+        // ==========================================
         DispatchQueue.main.async {
             self.currentLocation = location
         }
     }
-    
     // Delegate เมื่อเข็มทิศ (Heading) เปลี่ยน
     func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
         DispatchQueue.main.async {

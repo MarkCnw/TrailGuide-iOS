@@ -6,8 +6,9 @@ struct RadarPageView: View {
     
     @State private var showScanSheet: Bool = false
     
-    init(userRepository: UserRepositoryProtocol?) {
-        _viewModel = State(initialValue: RadarViewModel(userRepository: userRepository))
+    // 🟢 ไม่รับ Repository แล้ว — รับ ViewModel ที่ถูกสร้างจาก DIContainer แทน
+    init(viewModel: RadarViewModel) {
+        _viewModel = State(initialValue: viewModel)
     }
     
     var body: some View {

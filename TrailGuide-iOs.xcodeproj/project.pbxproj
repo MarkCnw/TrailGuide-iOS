@@ -6,8 +6,23 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXCopyFilesBuildPhase section */
+		F2796D292FEA6DE300D4A4D8 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		F24FB9712F8A4AC6006B2E4F /* TrailGuide-iOs.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "TrailGuide-iOs.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F2796D102FEA6DE300D4A4D8 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		F2796D122FEA6DE300D4A4D8 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -46,6 +61,7 @@
 			isa = PBXGroup;
 			children = (
 				F24FB9732F8A4AC6006B2E4F /* TrailGuide-iOs */,
+				F2796D0F2FEA6DE300D4A4D8 /* Frameworks */,
 				F24FB9722F8A4AC6006B2E4F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -58,6 +74,15 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		F2796D0F2FEA6DE300D4A4D8 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				F2796D102FEA6DE300D4A4D8 /* WidgetKit.framework */,
+				F2796D122FEA6DE300D4A4D8 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -68,6 +93,7 @@
 				F24FB96D2F8A4AC6006B2E4F /* Sources */,
 				F24FB96E2F8A4AC6006B2E4F /* Frameworks */,
 				F24FB96F2F8A4AC6006B2E4F /* Resources */,
+				F2796D292FEA6DE300D4A4D8 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
@@ -90,7 +116,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2640;
+				LastSwiftUpdateCheck = 2700;
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					F24FB9702F8A4AC6006B2E4F = {
@@ -273,6 +299,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "TrailGuide-iOs/Info.plist";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "TrailGuide ต้องการใช้ Local Network และ Bluetooth เพื่อค้นหาเพื่อนนักเดินทางรอบตัวคุณ";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "TrailGuide ต้องการเข้าถึงตำแหน่งของคุณตลอดเวลา เพื่อบันทึกเส้นทางเดินป่าและแจ้งเตือนพิกัดเพื่อนๆ แม้คุณจะล็อคหน้าจออยู่ก็ตาม";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "TrailGuide ต้องการเข้าถึงตำแหน่งของคุณเพื่อแสดงตำแหน่งบนเรดาร์และแชร์ให้เพื่อนร่วมทริป";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -308,6 +337,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "TrailGuide-iOs/Info.plist";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "TrailGuide ต้องการใช้ Local Network และ Bluetooth เพื่อค้นหาเพื่อนนักเดินทางรอบตัวคุณ";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "TrailGuide ต้องการเข้าถึงตำแหน่งของคุณตลอดเวลา เพื่อบันทึกเส้นทางเดินป่าและแจ้งเตือนพิกัดเพื่อนๆ แม้คุณจะล็อคหน้าจออยู่ก็ตาม";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "TrailGuide ต้องการเข้าถึงตำแหน่งของคุณเพื่อแสดงตำแหน่งบนเรดาร์และแชร์ให้เพื่อนร่วมทริป";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

@@ -1,12 +1,11 @@
 import SwiftUI
-import MultipeerConnectivity
 
 struct ScanView: View {
     @ObservedObject var viewModel: RoomViewModel
     @Environment(\.dismiss) var dismiss
     
-    @State private var joiningPeer: MCPeerID? = nil
-    @State private var rejectedPeer: MCPeerID? = nil
+    @State private var joiningPeer: String? = nil
+    @State private var rejectedPeer: String? = nil
     @State private var joinTimer: Timer? = nil
 
     var body: some View {
@@ -75,7 +74,7 @@ struct ScanView: View {
     }
     
     // MARK: - Helper Views
-    private func peerRow(for peer: MCPeerID) -> some View {
+    private func peerRow(for peer: String) -> some View {
         Button(action: {
             viewModel.lastConnectionError = nil
             rejectedPeer = nil
@@ -92,7 +91,7 @@ struct ScanView: View {
             }
         }) {
             HStack {
-                Text(peer.displayName).font(.headline).foregroundColor(.primary)
+                Text(peer).font(.headline).foregroundColor(.primary)
                 Spacer()
                 
                 if joiningPeer == peer {
@@ -121,7 +120,7 @@ struct ScanView: View {
     }
     
     // MARK: - Logic
-    private func handleRejection(for peer: MCPeerID) {
+    private func handleRejection(for peer: String) {
         joinTimer?.invalidate()
         joiningPeer = nil
         rejectedPeer = peer

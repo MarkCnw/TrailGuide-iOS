@@ -2,6 +2,8 @@ import Foundation
 import UIKit
 import ImageIO
 
+/// ย้ายมาจาก Domain → Presentation เพราะใช้ UIKit/ImageIO ล้วนๆ
+/// ไม่ใช่ Business Logic แต่เป็น UI utility สำหรับบีบอัดภาพโปรไฟล์
 class ProcessProfileImageUseCase {
     // 🟢 ย้ายโค้ด CoreGraphics สุดรกมาซ่อนไว้ที่นี่ ViewModel จะได้สะอาด
     func execute(fileName: String) async -> (image: UIImage, compressedData: Data)? {

@@ -1,14 +1,10 @@
 import SwiftUI
-import SwiftData
 
 struct MainTabView: View {
     @StateObject private var roomViewModel: RoomViewModel
     @State private var selectedTab = 0
-    private var userRepository: UserRepositoryProtocol
     
-    init(userRepository: UserRepositoryProtocol) {
-        self.userRepository = userRepository
-        
+    init() {
         // 🟢 เปลี่ยนจากสร้างตรงๆ มาให้ DIContainer ประกอบร่าง RoomViewModel ให้
         _roomViewModel = StateObject(wrappedValue: DIContainer.shared.makeRoomViewModel())
         
@@ -34,7 +30,8 @@ struct MainTabView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            RadarPageView(userRepository: userRepository)
+            // 🟢 สร้าง RadarViewModel จาก DIContainer แทน
+            RadarPageView(viewModel: DIContainer.shared.makeRadarViewModel())
                 .tabItem {
                     Label("เรดาร์", systemImage: "safari.fill")
                 }
@@ -55,7 +52,8 @@ struct MainTabView: View {
                 }
                 .tag(2)
             
-            ProfileSettingsView(userRepository: userRepository)
+            // 🟢 สร้าง ProfileSettingsView จาก DIContainer
+            DIContainer.shared.makeProfileSettingsView()
                 .tabItem {
                     Label("โปรไฟล์", systemImage: "person")
                 }
