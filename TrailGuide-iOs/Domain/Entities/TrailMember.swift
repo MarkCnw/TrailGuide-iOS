@@ -1,17 +1,16 @@
 import Foundation
 import CoreLocation
-import UIKit
-import MultipeerConnectivity
 
 // 🟢 Entity ตัวนี้จะทำหน้าที่เป็น "ตัวแทน" ของเพื่อนแต่ละคนในห้อง
+// ใช้ String เป็น ID แทน MCPeerID และ Data แทน UIImage เพื่อให้ Domain บริสุทธิ์
 struct TrailMember: Identifiable {
-    let id: MCPeerID // ใช้ MCPeerID เป็น ID หลักชั่วคราวเพื่อให้ผูกกับ P2P ได้ง่าย
-    var name: String { id.displayName }
+    let id: String // ใช้ชื่อ peer name เป็น ID
+    var name: String { id }
     
     var location: CLLocationCoordinate2D?
     var heading: Double?
     var lastSeen: Date?
-    var profileImage: UIImage?
+    var profileImageData: Data? // ใช้ Data แทน UIImage เพื่อไม่ต้อง import UIKit
     
     // คืนค่าสถานะว่าสัญญาณหายหรือไม่ (สมมติว่าถ้าไม่เห็นเกิน 30 วินาที = ขาดการติดต่อ)
     var isSignalLost: Bool {

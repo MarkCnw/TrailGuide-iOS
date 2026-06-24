@@ -1,6 +1,5 @@
 import SwiftUI
 import PhotosUI
-import SwiftData
 
 @Observable
 final class ProfileSetupViewModel {
@@ -12,6 +11,13 @@ final class ProfileSetupViewModel {
     
     var profileImage: Image?
     private var profileImageData: Data?
+    
+    // 🟢 ฉีด UseCase เข้ามาแทนการสร้าง Repository เองตรงๆ
+    private let saveUserProfileUseCase: SaveUserProfileUseCase
+    
+    init(saveUserProfileUseCase: SaveUserProfileUseCase) {
+        self.saveUserProfileUseCase = saveUserProfileUseCase
+    }
     
     var isFormValid: Bool {
         let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -50,7 +56,7 @@ final class ProfileSetupViewModel {
     }
     
     @MainActor
-    func saveProfile(context: ModelContext) {
+    func saveProfile() {
         guard isFormValid else { return }
         
         var savedImageFileName: String? = nil
@@ -69,12 +75,11 @@ final class ProfileSetupViewModel {
             }
         }
         
-        let repo = UserRepositoryImpl(modelContext: context)
         let newProfile = UserProfileEntity(username: username, imagePath: savedImageFileName)
         
         Task {
             do {
-                try await repo.saveUserProfile(profile: newProfile)
+                try await saveUserProfileUseCase.execute(profile: newProfile)
                 UserDefaults.standard.set(true, forKey: "hasProfile")
                 UserDefaults.standard.set(self.username, forKey: "current_username")
             } catch {

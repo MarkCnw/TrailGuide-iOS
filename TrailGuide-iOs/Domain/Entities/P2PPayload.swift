@@ -1,6 +1,6 @@
 import Foundation
 
-// 🟢 เพิ่มคำว่า Sendable เข้าไปที่ Enum และ Struct
+// 🟢 โครงสร้างข้อมูลนี้อยู่ในชั้น Domain เพราะเป็น Business Entity ที่ใช้ร่วมกันทั้งระบบ
 enum PayloadType: String, Codable, Sendable {
     case startAdventure
     case locationUpdate

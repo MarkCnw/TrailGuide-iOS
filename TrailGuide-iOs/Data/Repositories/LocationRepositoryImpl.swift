@@ -8,10 +8,10 @@ import OSLog
 // ==========================================
 enum GPSConstants {
     static let accuracyThreshold: CLLocationAccuracy = 20.0
-    static let distanceThreshold: CLLocationDistance = 5.0
+    static let distanceThreshold: CLLocationDistance = 1.0
     static let maxHikingSpeed: CLLocationSpeed = 4.16 // ~15 km/h
     static let stationarySpeedThreshold: CLLocationSpeed = 0.5
-    static let stationaryDistanceThreshold: CLLocationDistance = 3.0
+    static let stationaryDistanceThreshold: CLLocationDistance = 0.5
     static let stationaryTimeThreshold: TimeInterval = 30.0
     static let movingAverageWindowSize: Int = 5
 }

@@ -6,18 +6,17 @@ final class RadarViewModel {
     var username: String = "กำลังโหลด..."
     var profileImage: UIImage? = nil
     
-    // 🟢 แก้ให้รับ UserRepository เพื่อให้ตรงกับที่ส่งมาจาก MainTabView
-    let userRepository: UserRepositoryProtocol?
+    // 🟢 ใช้ UseCase แทน Repository โดยตรง
+    private let getUserProfileUseCase: GetUserProfileUseCase
     
-    init(userRepository: UserRepositoryProtocol?) {
-        self.userRepository = userRepository
+    init(getUserProfileUseCase: GetUserProfileUseCase) {
+        self.getUserProfileUseCase = getUserProfileUseCase
     }
     
     @MainActor
     func loadUserData() async {
-        guard let repo = userRepository else { return }
         do {
-            if let profile = try await repo.getUserProfile() {
+            if let profile = try await getUserProfileUseCase.execute() {
                 self.username = profile.username
                 
                 // 🟢 ประกอบ Path รูปภาพใหม่แบบเดียวกับหน้า Setting

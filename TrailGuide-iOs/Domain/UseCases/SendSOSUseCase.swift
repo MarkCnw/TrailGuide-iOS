@@ -1,5 +1,4 @@
 import Foundation
-import MultipeerConnectivity
 
 class SendSOSUseCase {
     private let p2pService: P2PServiceProtocol

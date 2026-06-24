@@ -1,13 +1,15 @@
 import SwiftUI
 import PhotosUI
-import SwiftData
 
 struct ProfileSetupView: View {
-    @State private var viewModel = ProfileSetupViewModel()
-    @Environment(\.modelContext) private var modelContext
+    @State private var viewModel: ProfileSetupViewModel
     
     // 🟢 HIG: ใช้ FocusState เพื่อจัดการ Keyboard
     @FocusState private var isTextFieldFocused: Bool
+    
+    init(viewModel: ProfileSetupViewModel) {
+        _viewModel = State(initialValue: viewModel)
+    }
     
     var body: some View {
         NavigationStack {
@@ -69,7 +71,7 @@ struct ProfileSetupView: View {
                     // --- 4. ปุ่มยืนยัน ---
                     Button(action: {
                         isTextFieldFocused = false
-                        viewModel.saveProfile(context: modelContext)
+                        viewModel.saveProfile()
                     }) {
                         Text("เข้าสู่ระบบ TrailGuide")
                             .font(.headline)
@@ -135,5 +137,5 @@ struct ProfileSetupView: View {
 }
 
 #Preview {
-    ProfileSetupView()
+    ProfileSetupView(viewModel: ProfileSetupViewModel(saveUserProfileUseCase: SaveUserProfileUseCase(userRepository: DIContainer.shared.userRepository)))
 }

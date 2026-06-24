@@ -18,6 +18,29 @@ struct BreadcrumbView: View {
         ZStack(alignment: .bottom) {
             
             // ==========================================
+            // 🚨 Banner แจ้งเตือนหลงทาง (แสดงด้านบน)
+            // ==========================================
+            VStack {
+                if viewModel.isOffRoute {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                        Text("คุณกำลังออกนอกเส้นทาง")
+                            .font(.headline)
+                    }
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.red.opacity(0.9))
+                    .cornerRadius(12)
+                    .padding(.horizontal)
+                    .padding(.top, 60)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(1)
+                }
+                Spacer()
+            }
+            
+            // ==========================================
             // 🗺️ ส่วนที่ 1: แผนที่
             // ==========================================
             Map(position: $cameraPosition, bounds: MapCameraBounds(minimumDistance: 100, maximumDistance: 500)) {
@@ -65,18 +88,20 @@ struct BreadcrumbView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("กำลังย้อนกลับทางเดิม")
                             .font(.caption)
+                            
                             .foregroundColor(.orange)
                         
                         Text("เหลือ \(String(format: "%.0f", viewModel.totalBacktrackDistance)) เมตร")
                             .font(.headline)
-                            .foregroundColor(.white)
-                    }
+                            .foregroundColor(.primary)
+                    }.padding(.leading, 17)
                     
                     Spacer()
                     
                     Button(action: {
                         withAnimation {
                             viewModel.stopBacktracking()
+                            viewModel.startTracking() // 🟢 เพิ่มบรรทัดนี้ เพื่อให้กลับเข้าโหมดบันทึกเส้นทางปกติ
                         }
                     }) {
                         Label("หยุดย้อนกลับ", systemImage: "xmark.circle.fill")
@@ -105,19 +130,23 @@ struct BreadcrumbView: View {
                 } else {
                     
                     // 🌟 ปุ่มย้อนกลับ
+                    let canBacktrack = viewModel.rawRoutePath.count >= BreadcrumbViewModel.BacktrackConstants.minimumBacktrackPoints
                     Button(action: {
-                        withAnimation {
-                            viewModel.startBacktracking()
+                        if canBacktrack {
+                            withAnimation {
+                                viewModel.startBacktracking()
+                            }
                         }
                     }) {
                         Label("ย้อนกลับ", systemImage: "arrow.uturn.backward")
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundColor(canBacktrack ? .white : .white.opacity(0.5))
                             .padding(.vertical, 12)
                             .padding(.horizontal, 20)
-                            .background(Color.orange) // เปลี่ยนเป็นสีส้มให้ชัดเจน
+                            .background(canBacktrack ? Color.orange : Color.gray)
                             .clipShape(Capsule())
                     }
+                    .disabled(!canBacktrack)
                     
                     // 🛑 ปุ่มจบทริป (กดแล้วเรียก Pop-up)
                     Button(action: {
@@ -136,20 +165,20 @@ struct BreadcrumbView: View {
                     // ==========================================
                     .alert("จบทริป", isPresented: $isShowingAlert) {
                         
-                        // ปุ่มบันทึก
+                        // 1. ปุ่มบันทึก (Default) - จะแสดงเป็นสีตาม Global Accent Color ของแอป
                         Button("บันทึก") {
                             viewModel.stopTracking()
                             viewModel.saveCurrentTrip()
                             viewModel.clearTracking()
                         }
                         
-                        // ปุ่มทิ้งเส้นทาง
+                        // 2. ปุ่มทิ้งเส้นทาง (Destructive) - จะกลายเป็นสีแดงให้อัตโนมัติ
                         Button("ทิ้งเส้นทาง", role: .destructive) {
                             viewModel.stopTracking()
                             viewModel.clearTracking()
                         }
                         
-                        // ปุ่มยกเลิก
+                        // 3. ปุ่มยกเลิก (Cancel) - จะแสดงเป็นสีปกติและตัวหนา (ถ้าเป็น iOS เวอร์ชั่นใหม่ๆ)
                         Button("ยกเลิก", role: .cancel) { }
                         
                     } message: {

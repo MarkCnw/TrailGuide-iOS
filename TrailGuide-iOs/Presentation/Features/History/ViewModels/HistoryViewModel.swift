@@ -7,30 +7,34 @@ final class HistoryViewModel {
     // 📋 รายการทริปทั้งหมด
     var trips: [TripHistory] = []
     
-    // พนักงานฐานข้อมูล
-    private let tripRepository: TripHistoryRepositoryProtocol
+    // 🟢 ใช้ UseCases แทน Repository โดยตรง
+    private let getAllTripsUseCase: GetAllTripsUseCase
+    private let updateTripNameUseCase: UpdateTripNameUseCase
+    private let deleteTripUseCase: DeleteTripUseCase
     
-    // 🤝 รับ Repository เข้ามาผ่าน init (Dependency Injection)
-    init(tripRepository: TripHistoryRepositoryProtocol) {
-        self.tripRepository = tripRepository
+    // 🤝 รับ UseCases เข้ามาผ่าน init (Dependency Injection)
+    init(getAllTripsUseCase: GetAllTripsUseCase, updateTripNameUseCase: UpdateTripNameUseCase, deleteTripUseCase: DeleteTripUseCase) {
+        self.getAllTripsUseCase = getAllTripsUseCase
+        self.updateTripNameUseCase = updateTripNameUseCase
+        self.deleteTripUseCase = deleteTripUseCase
         loadTrips()
     }
     
     // 📥 โหลดทริปทั้งหมดจากฐานข้อมูล (เรียงจากใหม่ → เก่า)
     func loadTrips() {
-        trips = tripRepository.getAllTrips()
+        trips = getAllTripsUseCase.execute()
             .sorted { $0.date > $1.date }
     }
     
     // ✏️ เปลี่ยนชื่อทริป
     func updateTripName(id: Int, newName: String) {
-        tripRepository.updateTripName(id: id, newName: newName)
+        updateTripNameUseCase.execute(id: id, newName: newName)
         loadTrips() // โหลดใหม่เพื่ออัพเดทหน้าจอ
     }
     
     // 🗑️ ลบทริป
     func deleteTrip(id: Int) {
-        tripRepository.deleteTrip(id: id)
+        deleteTripUseCase.execute(id: id)
         loadTrips() // โหลดใหม่เพื่ออัพเดทหน้าจอ
     }
     

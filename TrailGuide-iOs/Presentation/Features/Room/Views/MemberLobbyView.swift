@@ -1,5 +1,4 @@
 import SwiftUI
-import MultipeerConnectivity
 
 struct MemberLobbyView: View {
     @ObservedObject var viewModel: RoomViewModel
@@ -73,14 +72,14 @@ struct MemberLobbyView: View {
     }
 
     @ViewBuilder
-    private func memberRow(for peer: MCPeerID) -> some View {
+    private func memberRow(for peer: String) -> some View {
         let isMe = peer == viewModel.allMembers.first
         let isHost = viewModel.isHost(peer)
         
         HStack(spacing: 12) {
             ZStack {
-                // 🟢 แก้จุดนี้: ดึงรูปจาก TrailMember เหมือนกัน
-                if let uiImage = viewModel.trailMembers[peer]?.profileImage {
+                // 🟢 ดึงรูปจาก TrailMember (profileImageData → UIImage)
+                if let imgData = viewModel.trailMembers[peer]?.profileImageData, let uiImage = UIImage(data: imgData) {
                     Image(uiImage: uiImage)
                         .resizable()
                         .scaledToFill()
@@ -91,7 +90,7 @@ struct MemberLobbyView: View {
                     Circle()
                         .fill(isHost ? Color.orange.opacity(0.1) : Color.green.opacity(0.1))
                         .frame(width: 40, height: 40)
-                    Text(String(peer.displayName.prefix(1)).uppercased())
+                    Text(String(peer.prefix(1)).uppercased())
                         .fontWeight(.bold)
                         .foregroundColor(isHost ? .orange : .green)
                 }
@@ -99,7 +98,7 @@ struct MemberLobbyView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
-                    Text(peer.displayName)
+                    Text(peer)
                         .font(.headline)
                     if isMe { Text("(คุณ)").font(.caption2).foregroundColor(.secondary) }
                 }

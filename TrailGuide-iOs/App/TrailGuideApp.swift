@@ -14,24 +14,24 @@ struct TrailGuideApp: App {
         
         // 🟢 2. เปิดใช้งานกล่องฐานข้อมูล (SwiftData) ตั้งแต่ตอนแอปเริ่มรัน
         do {
-            // 👇 เติม TripHistoryModel.self เข้าไปตรงนี้ครับ!
             sharedModelContainer = try ModelContainer(for: UserProfileSchema.self, TripHistoryModel.self)
         } catch {
             fatalError("ไม่สามารถสร้างฐานข้อมูลได้: \(error)")
         }
+        
+        // 🔔 ขอสิทธิ์การแจ้งเตือน Local Notification ตอนเปิดแอป
+        DIContainer.shared.notificationService.requestPermission()
     }
     
     var body: some Scene {
         WindowGroup {
             Group {
                 if hasProfile {
-                    // 🟢 3. สร้าง UserRepository และ "ส่งเข้าไป" ให้ MainTabView
-                    let context = ModelContext(sharedModelContainer)
-                    let repo = UserRepositoryImpl(modelContext: context)
-                    
-                    MainTabView(userRepository: repo) // 👈 ตอนนี้เราไม่ส่งมือเปล่าแล้ว!
+                    // 🟢 MainTabView ไม่ต้องรับ Repository อีกต่อไปแล้ว
+                    MainTabView()
                 } else {
-                    ProfileSetupView()
+                    // 🟢 สร้าง ProfileSetupView ผ่าน DIContainer
+                    ProfileSetupView(viewModel: DIContainer.shared.makeProfileSetupViewModel())
                 }
             }
             .preferredColorScheme(appTheme == "light" ? .light : (appTheme == "dark" ? .dark : nil))

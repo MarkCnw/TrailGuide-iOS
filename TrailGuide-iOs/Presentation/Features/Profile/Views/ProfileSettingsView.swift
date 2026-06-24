@@ -14,7 +14,9 @@ struct ProfileSettingsView: View {
     @State private var newUsername: String = ""
     @State private var selectedPhotoItem: PhotosPickerItem? = nil
     
-    var userRepository: UserRepositoryProtocol?
+    // 🟢 ใช้ UseCases แทน Repository โดยตรง
+    let getUserProfileUseCase: GetUserProfileUseCase
+    let saveUserProfileUseCase: SaveUserProfileUseCase
     
     var body: some View {
         NavigationStack {
@@ -164,18 +166,14 @@ struct ProfileSettingsView: View {
     
     // MARK: - Logic & Functions
     private func fetchProfile() async {
-        if let repo = userRepository {
-            do {
-                if let profile = try await repo.getUserProfile() {
-                    await MainActor.run { self.userProfile = profile }
-                } else {
-                    await MainActor.run { self.userProfile = UserProfileEntity(username: "นักเดินทาง", imagePath: nil) }
-                }
-            } catch {
-                print("❌ Error fetching profile: \(error)")
+        do {
+            if let profile = try await getUserProfileUseCase.execute() {
+                await MainActor.run { self.userProfile = profile }
+            } else {
                 await MainActor.run { self.userProfile = UserProfileEntity(username: "นักเดินทาง", imagePath: nil) }
             }
-        } else {
+        } catch {
+            print("❌ Error fetching profile: \(error)")
             await MainActor.run { self.userProfile = UserProfileEntity(username: "นักเดินทาง", imagePath: nil) }
         }
     }
@@ -214,12 +212,10 @@ struct ProfileSettingsView: View {
                             try compressedData.write(to: fileURL)
                             
                             let updatedProfile = UserProfileEntity(username: currentProfile.username, imagePath: newFileName)
-                            if let repo = userRepository {
-                                try await repo.saveUserProfile(profile: updatedProfile)
-                                await MainActor.run {
-                                    self.userProfile = updatedProfile
-                                    roomViewModel.updateProfileImage()
-                                }
+                            try await saveUserProfileUseCase.execute(profile: updatedProfile)
+                            await MainActor.run {
+                                self.userProfile = updatedProfile
+                                roomViewModel.updateProfileImage()
                             }
                         }
                     }
@@ -236,14 +232,12 @@ struct ProfileSettingsView: View {
             let updatedProfile = UserProfileEntity(username: trimmedName, imagePath: currentProfile.imagePath)
             Task {
                 do {
-                    if let repo = userRepository {
-                        try await repo.saveUserProfile(profile: updatedProfile)
-                        await MainActor.run {
-                            self.userProfile = updatedProfile
-                            
-                            // 🟢 2. เรียกใช้ฟังก์ชันอัปเดตชื่อในระบบเรดาร์
-                            roomViewModel.updateUsername(trimmedName)
-                        }
+                    try await saveUserProfileUseCase.execute(profile: updatedProfile)
+                    await MainActor.run {
+                        self.userProfile = updatedProfile
+                        
+                        // 🟢 2. เรียกใช้ฟังก์ชันอัปเดตชื่อในระบบเรดาร์
+                        roomViewModel.updateUsername(trimmedName)
                     }
                 } catch {
                     print("❌ Error saving name: \(error.localizedDescription)")

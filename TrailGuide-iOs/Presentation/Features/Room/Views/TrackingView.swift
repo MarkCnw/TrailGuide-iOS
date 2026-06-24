@@ -1,5 +1,4 @@
 import SwiftUI
-import MultipeerConnectivity
 import CoreLocation
 import Combine
 
@@ -125,8 +124,8 @@ struct TrackingView: View {
             let maxRadius = max(min(geometry.size.width, geometry.size.height) / 2 - 20, 0)
             
             // 🟢 ดึงข้อมูลของตัวเอง (คนแรกใน List เสมอ)
-            let myPeerId = viewModel.allMembers.first
-            let myHeading = myPeerId.flatMap { viewModel.trailMembers[$0]?.heading } ?? 0
+            let myPeerName = viewModel.allMembers.first
+            let myHeading = myPeerName.flatMap { viewModel.trailMembers[$0]?.heading } ?? 0
             
             ZStack {
                 Color(.systemGroupedBackground).ignoresSafeArea(edges: .top)
@@ -156,7 +155,7 @@ struct TrackingView: View {
                 }
 
                 // --- วาดจุดเพื่อน ร่วมทริป บนเรดาร์ ---
-                if let myId = myPeerId, let myLocCoord = viewModel.trailMembers[myId]?.location {
+                if let myName = myPeerName, let myLocCoord = viewModel.trailMembers[myName]?.location {
                     let myLoc = CLLocation(latitude: myLocCoord.latitude, longitude: myLocCoord.longitude)
                     
                     ForEach(Array(viewModel.allMembers.dropFirst()), id: \.self) { peer in
@@ -165,8 +164,8 @@ struct TrackingView: View {
                             let distance = myLoc.distance(from: peerLoc)
                             
                             let bearing = LocationCalculator.calculateBearing(
-                                lat1: myLocCoord.latitude, lon1: myLocCoord.longitude,
-                                lat2: peerLocCoord.latitude, lon2: peerLocCoord.longitude)
+                                from: myLocCoord,
+                                to: peerLocCoord)
                             
                             let relativeAngle = bearing - myHeading
                             let maxDisplayDistance: Double = 150.0
@@ -191,7 +190,7 @@ struct TrackingView: View {
                                         .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: isSOSActive)
                                 }
                                 
-                                if let uiImage = viewModel.trailMembers[peer]?.profileImage {
+                                if let imgData = viewModel.trailMembers[peer]?.profileImageData, let uiImage = UIImage(data: imgData) {
                                     Image(uiImage: uiImage)
                                         .resizable().scaledToFill()
                                         .frame(width: 36, height: 36)
@@ -203,7 +202,7 @@ struct TrackingView: View {
                                 } else {
                                     Circle().fill(isDisconnected ? Color.gray : (isSOSActive ? Color.red : Color.orange)).frame(width: 36, height: 36)
                                         .shadow(radius: 3)
-                                    Text(String(peer.displayName.prefix(1)).uppercased())
+                                    Text(String(peer.prefix(1)).uppercased())
                                         .font(.caption).fontWeight(.bold).foregroundColor(.white)
                                 }
                                 
@@ -227,7 +226,7 @@ struct TrackingView: View {
         }
     }
 
-    private func getCoordText(peer: MCPeerID, isDisconnected: Bool, secondsSinceLastSeen: TimeInterval) -> String {
+    private func getCoordText(peer: String, isDisconnected: Bool, secondsSinceLastSeen: TimeInterval) -> String {
         let coordinate = viewModel.trailMembers[peer]?.location
         if isDisconnected {
             let minutes = Int(secondsSinceLastSeen / 60)
@@ -243,7 +242,7 @@ struct TrackingView: View {
 
     // --- Component: แถวแสดงผลสมาชิก ---
     @ViewBuilder
-    private func memberTrackingRow(for peer: MCPeerID) -> some View {
+    private func memberTrackingRow(for peer: String) -> some View {
         let isHost = viewModel.isHost(peer)
         let lastSeenDate = viewModel.trailMembers[peer]?.lastSeen
         let secondsSinceLastSeen = lastSeenDate != nil ? currentTime.timeIntervalSince(lastSeenDate!) : 0
@@ -261,7 +260,7 @@ struct TrackingView: View {
         
         HStack(spacing: 12) {
             ZStack {
-                if let uiImage = viewModel.trailMembers[peer]?.profileImage {
+                if let imgData = viewModel.trailMembers[peer]?.profileImageData, let uiImage = UIImage(data: imgData) {
                     Image(uiImage: uiImage)
                         .resizable().scaledToFill()
                         .frame(width: 44, height: 44)
@@ -273,7 +272,7 @@ struct TrackingView: View {
                     Circle()
                         .fill(isDisconnected ? Color.gray.opacity(0.15) : (isSOSActive ? Color.red.opacity(0.15) : (isHost ? Color.orange.opacity(0.15) : Color.green.opacity(0.15))))
                         .frame(width: 44, height: 44)
-                    Text(String(peer.displayName.prefix(1)).uppercased())
+                    Text(String(peer.prefix(1)).uppercased())
                         .fontWeight(.bold)
                         .foregroundColor(isDisconnected ? .gray : (isSOSActive ? .red : (isHost ? .orange : .green)))
                 }
@@ -281,7 +280,7 @@ struct TrackingView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 4) {
-                    Text(peer.displayName)
+                    Text(peer)
                         .fontWeight(.semibold)
                         .foregroundColor(isDisconnected ? .secondary : (isSOSActive ? .red : .primary))
                     

@@ -6,40 +6,47 @@ import SwiftUI
 @Observable
 final class BreadcrumbViewModel {
     
+    enum BacktrackConstants {
+        static let waypointReachThreshold: CLLocationDistance = 10.0
+        static let offRouteThreshold: CLLocationDistance = 20.0
+        static let minimumBacktrackPoints: Int = 2
+        static let waypointSpacing: CLLocationDistance = 10.0
+        static let waypointBearingChangeThreshold: Double = 30.0
+    }
+    
     var isRecording: Bool = false
     var routePath: [CLLocationCoordinate2D] = []
-    var rawRoutePath: [CLLocationCoordinate2D] = [] // สำหรับ Save และ Backtrack
+    var rawRoutePath: [CLLocationCoordinate2D] = []
     
-    // พนักงานที่เราใช้งาน
     private let locationRepository: LocationRepositoryProtocol
-    private let tripRepository: TripHistoryRepositoryProtocol
-    
+    private let saveTripUseCase: SaveTripUseCase
+    private let notificationService: NotificationServiceProtocol
     private var cancellables = Set<AnyCancellable>()
     
-    // 🤝 รับอุปกรณ์เข้ามารวมกันใน init เดียว
-    init(locationRepository: LocationRepositoryProtocol, tripRepository: TripHistoryRepositoryProtocol) {
+    /// ชื่อผู้ใช้สำหรับพูดออกเสียง (อ่านจาก UserDefaults)
+    private var username: String {
+        UserDefaults.standard.string(forKey: "username") ?? "นักเดินทาง"
+    }
+    
+    /// ป้องกันการส่ง Notification ซ้ำ — ส่งแค่ครั้งเดียวจนกว่าจะกลับเข้าเส้นทางแล้วออกอีกรอบ
+    private var hasNotifiedOffRoute = false
+    
+    init(locationRepository: LocationRepositoryProtocol, saveTripUseCase: SaveTripUseCase, notificationService: NotificationServiceProtocol) {
         self.locationRepository = locationRepository
-        self.tripRepository = tripRepository
-        
+        self.saveTripUseCase = saveTripUseCase
+        self.notificationService = notificationService
         startListeningToRoute()
     }
     
     private func startListeningToRoute() {
-        // ฟังการวาดเส้นทาง (Smoothed) สำหรับแสดงบนแผนที่
         locationRepository.routePathPublisher
-            .sink { [weak self] newPath in
-                self?.routePath = newPath
-            }
+            .sink { [weak self] newPath in self?.routePath = newPath }
             .store(in: &cancellables)
-            
-        // ฟังเส้นทางจริง (Raw) สำหรับการเซฟและย้อนกลับ
+        
         locationRepository.rawRoutePathPublisher
-            .sink { [weak self] newPath in
-                self?.rawRoutePath = newPath
-            }
+            .sink { [weak self] newPath in self?.rawRoutePath = newPath }
             .store(in: &cancellables)
-            
-        // ฟังพิกัดปัจจุบันเพื่ออัพเดท Backtrack
+        
         locationRepository.currentLocationPublisher
             .sink { [weak self] location in
                 guard let self = self, let loc = location else { return }
@@ -52,6 +59,8 @@ final class BreadcrumbViewModel {
         locationRepository.startRecordingRoute()
         isRecording = true
         isBacktracking = false
+        
+        
     }
     
     func stopTracking() {
@@ -70,52 +79,96 @@ final class BreadcrumbViewModel {
     // 🔙 Backtrack Features
     // ==========================================
     var isBacktracking: Bool = false
+    var isOffRoute: Bool = false
     var backtrackPath: [CLLocationCoordinate2D] = []
     var nextWaypointIndex: Int = 0
     var distanceToNextWaypoint: Double = 0.0
     var totalBacktrackDistance: Double = 0.0
     
     func startBacktracking() {
-        guard !rawRoutePath.isEmpty else { return }
-        // หยุดบันทึกเส้นทางปกติ
+        guard rawRoutePath.count >= BacktrackConstants.minimumBacktrackPoints else { return }
         stopTracking()
         
-        // Reverse เส้นทาง (ใช้ Raw Route แทน Smoothed)
-        backtrackPath = rawRoutePath.reversed()
+        let reversedPath = Array(rawRoutePath.reversed())
+        
+        backtrackPath = LocationCalculator.simplifyPath(
+            reversedPath,
+            spacing: BacktrackConstants.waypointSpacing,
+            bearingThreshold: BacktrackConstants.waypointBearingChangeThreshold
+        )
+        
         nextWaypointIndex = 0
         isBacktracking = true
+        isOffRoute = false
         
         calculateBacktrackDistances(currentLocation: nil)
+        
+        
+        
     }
     
     func stopBacktracking() {
         isBacktracking = false
+        isOffRoute = false
         backtrackPath = []
         nextWaypointIndex = 0
         distanceToNextWaypoint = 0.0
         totalBacktrackDistance = 0.0
+        
+        
     }
     
     func updateBacktrackProgress(userLocation: CLLocationCoordinate2D) {
         guard isBacktracking, nextWaypointIndex < backtrackPath.count else { return }
         
+        // ✅ FIX Bug #1: อัปเดตระยะทาง *ก่อน* ตรวจว่าถึง waypoint หรือยัง
+        // เพื่อให้ตัวเลขระยะทางขยับอัปเดตตลอดเวลา ไม่ค้าง
+        checkOffRoute(userLocation: userLocation)
+        calculateBacktrackDistances(currentLocation: userLocation)
+        
         let targetLocation = backtrackPath[nextWaypointIndex]
-        let userLoc = CLLocation(latitude: userLocation.latitude, longitude: userLocation.longitude)
-        let targetLoc = CLLocation(latitude: targetLocation.latitude, longitude: targetLocation.longitude)
+        let distance = LocationCalculator.calculateDistance(from: userLocation, to: targetLocation)
         
-        let distance = userLoc.distance(from: targetLoc)
-        
-        // ถ้าเข้าใกล้จุดหมายในระยะ 15 เมตร ให้ถือว่าผ่านจุดนี้แล้ว ไปจุดถัดไป
-        if distance < 15.0 {
+        if distance < BacktrackConstants.waypointReachThreshold {
             nextWaypointIndex += 1
             if nextWaypointIndex >= backtrackPath.count {
-                // ถึงจุดเริ่มต้นแล้ว (จบ backtrack)
+                // 🏁 ถึงจุดเริ่มต้นแล้ว — ส่ง Notification + พูดเสียง
+                let message = "ยินดีด้วย! คุณเดินทางย้อนกลับมาถึงจุดเริ่มต้นอย่างปลอดภัยแล้ว"
+                notificationService.sendNotification(title: "✅ ถึงจุดเริ่มต้นแล้ว!", body: message)
+                notificationService.speak("\(username) \(message)")
                 stopBacktracking()
                 return
             }
         }
+    }
+    
+    private func checkOffRoute(userLocation: CLLocationCoordinate2D) {
+        guard backtrackPath.count > 1 else { return }
+        var minDistance = Double.infinity
         
-        calculateBacktrackDistances(currentLocation: userLocation)
+        let startIndex = max(0, nextWaypointIndex - 1)
+        for i in startIndex..<(backtrackPath.count - 1) {
+            let p1 = backtrackPath[i]
+            let p2 = backtrackPath[i+1]
+            let dist = LocationCalculator.crossTrackDistance(point: userLocation, start: p1, end: p2)
+            if dist < minDistance {
+                minDistance = dist
+            }
+        }
+        
+        
+        isOffRoute = minDistance > BacktrackConstants.offRouteThreshold
+        
+        // ⚠️ ส่ง Notification + พูดเสียง เมื่อเพิ่งออกนอกเส้นทาง (ส่งแค่ครั้งเดียว ไม่ spam)
+        if isOffRoute && !hasNotifiedOffRoute {
+            hasNotifiedOffRoute = true
+            let message = "ระวัง! คุณกำลังเดินเบี่ยงออกนอกเส้นทางที่บันทึกไว้ โปรดเปิดแผนที่เพื่อตรวจสอบ"
+            notificationService.sendNotification(title: "⚠️ ออกนอกเส้นทาง!", body: message)
+            notificationService.speak("\(username) \(message)")
+        } else if !isOffRoute && hasNotifiedOffRoute {
+            // กลับเข้าเส้นทางแล้ว — รีเซ็ต flag เพื่อให้สามารถแจ้งเตือนได้อีกถ้าออกนอกเส้นทางอีกรอบ
+            hasNotifiedOffRoute = false
+        }
     }
     
     private func calculateBacktrackDistances(currentLocation: CLLocationCoordinate2D?) {
@@ -124,27 +177,19 @@ final class BreadcrumbViewModel {
         var totalDist: Double = 0.0
         
         if let currentLoc = currentLocation {
-            let userLoc = CLLocation(latitude: currentLoc.latitude, longitude: currentLoc.longitude)
-            let nextLoc = backtrackPath[nextWaypointIndex]
-            let nextCLLoc = CLLocation(latitude: nextLoc.latitude, longitude: nextLoc.longitude)
-            distanceToNextWaypoint = userLoc.distance(from: nextCLLoc)
+            let targetLoc = backtrackPath[nextWaypointIndex]
+            distanceToNextWaypoint = LocationCalculator.calculateDistance(from: currentLoc, to: targetLoc)
             totalDist += distanceToNextWaypoint
             
-            // คำนวณระยะทางจาก nextWaypoint ไปจนจบ
             if nextWaypointIndex + 1 < backtrackPath.count {
                 for i in (nextWaypointIndex + 1)..<backtrackPath.count {
-                    let loc1 = CLLocation(latitude: backtrackPath[i-1].latitude, longitude: backtrackPath[i-1].longitude)
-                    let loc2 = CLLocation(latitude: backtrackPath[i].latitude, longitude: backtrackPath[i].longitude)
-                    totalDist += loc1.distance(from: loc2)
+                    totalDist += LocationCalculator.calculateDistance(from: backtrackPath[i-1], to: backtrackPath[i])
                 }
             }
         } else {
-            // ถ้ายังไม่มี current location ตอนเริ่ม
             distanceToNextWaypoint = 0.0
             for i in 1..<backtrackPath.count {
-                let loc1 = CLLocation(latitude: backtrackPath[i-1].latitude, longitude: backtrackPath[i-1].longitude)
-                let loc2 = CLLocation(latitude: backtrackPath[i].latitude, longitude: backtrackPath[i].longitude)
-                totalDist += loc1.distance(from: loc2)
+                totalDist += LocationCalculator.calculateDistance(from: backtrackPath[i-1], to: backtrackPath[i])
             }
         }
         
@@ -156,25 +201,19 @@ final class BreadcrumbViewModel {
         formatter.locale = Locale(identifier: "th_TH")
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
-        
-        let dateString = formatter.string(from: Date())
-        return "ทริปวันที่ \(dateString)"
+        return "ทริปวันที่ \(formatter.string(from: Date()))"
     }
     
-    
     func saveCurrentTrip() {
-        // สร้างสมุดไดอารี่เล่มใหม่
         let newTrip = TripHistory(
-            id: Int.random(in: 1...999999), // 🟢 1. สุ่ม ID ใส่ไปก่อน
+            id: Int.random(in: 1...999999),
             name: generateDefaultTripName(),
             date: Date(),
             distance: 0.0,
-            duration: 0.0, // 🟢 2. ให้เป็นทศนิยมเพื่อตรงกับประเภท Double
-            routePath: self.rawRoutePath // 🟢 3. โยน Array เส้นทางจริงๆ ใส่ไปได้เลย (ใช้ Raw)
+            duration: 0.0,
+            routePath: self.rawRoutePath
         )
-        
-        // สั่งพนักงานเซฟลงตู้
-        tripRepository.saveTrip(newTrip)
+        saveTripUseCase.execute(newTrip)
         print("💾 บันทึกทริปสำเร็จ: \(newTrip.name)")
     }
 }
