@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<gpx version="1.1" creator="Xcode">
+    <wpt lat="13.756300" lon="100.501800"><name>Center</name></wpt>
+    <wpt lat="13.756315" lon="100.501815"><name>Jitter NE</name></wpt>
+    <wpt lat="13.756285" lon="100.501785"><name>Jitter SW</name></wpt>
+    <wpt lat="13.756305" lon="100.501820"><name>Jitter E</name></wpt>
+    <wpt lat="13.756295" lon="100.501790"><name>Jitter W</name></wpt>
+    <wpt lat="13.756300" lon="100.501800"><name>Back to Center</name></wpt>
+</gpx>

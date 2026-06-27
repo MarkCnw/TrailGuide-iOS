@@ -76,13 +76,13 @@ struct LobbyView: View {
                         .clipShape(Circle()).overlay(Circle().stroke(isHost ? Color.orange : Color.green, lineWidth: 1.5))
                 } else {
                     Circle().fill(isHost ? Color.orange.opacity(0.1) : Color.green.opacity(0.1)).frame(width: 40, height: 40)
-                    Text(String(peer.prefix(1)).uppercased())
+                    Text(String(peer.cleanPeerName.prefix(1)).uppercased())
                         .fontWeight(.bold).foregroundColor(isHost ? .orange : .green)
                 }
             }
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
-                    Text(peer).font(.headline)
+                    Text(peer.cleanPeerName).font(.headline)
                     if isMe { Text("(คุณ)").font(.caption2).foregroundColor(.secondary) }
                 }
                 Text(isHost ? "หัวหน้าทริป" : "สมาชิก").font(.caption).foregroundColor(isHost ? .orange : .secondary)

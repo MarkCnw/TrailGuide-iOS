@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<gpx version="1.1" creator="Xcode">
+    <wpt lat="13.756300" lon="100.501800"><name>Point 1</name></wpt>
+    <wpt lat="13.756400" lon="100.501800"><name>Point 2</name></wpt>
+    <wpt lat="13.756500" lon="100.501800"><name>Point 3</name></wpt>
+    <wpt lat="13.756600" lon="100.501800"><name>Point 4</name></wpt>
+    <wpt lat="13.756700" lon="100.501800"><name>Point 5</name></wpt>
+    <wpt lat="13.756800" lon="100.501800"><name>Point 6</name></wpt>
+    <wpt lat="13.756900" lon="100.501800"><name>Point 7</name></wpt>
+    </gpx>

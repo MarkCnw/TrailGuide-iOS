@@ -92,9 +92,10 @@ struct ProfileSettingsView: View {
                 // --- ส่วนที่ 4: การตั้งค่าบัญชี (Account Actions) ---
                 Section {
                     // 🟢 HIG: ปุ่มออกจากระบบควรอยู่ตรงกลาง และเป็นสีแดงชัดเจน
-                    Button(action: { showLogoutAlert = true }) {
-                        Text("ออกจากระบบและล้างข้อมูล")
-                            .font(.body.weight(.semibold))
+                    Button(action: {
+                        showLogoutAlert = true
+                    }) {
+                        Text("ออกจากระบบ")
                             .foregroundColor(.red)
                             .frame(maxWidth: .infinity, alignment: .center)
                     }

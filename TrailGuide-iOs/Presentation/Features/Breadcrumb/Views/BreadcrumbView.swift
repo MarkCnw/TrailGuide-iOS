@@ -58,13 +58,21 @@ struct BreadcrumbView: View {
                             .stroke(.orange, style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round, dash: [10, 10]))
                     }
                     
-                    // 🚩 จุดที่ต้องเดินไปถัดไป
-                    if viewModel.nextWaypointIndex < viewModel.backtrackPath.count {
-                        let nextPoint = viewModel.backtrackPath[viewModel.nextWaypointIndex]
-                        Annotation("จุดถัดไป", coordinate: nextPoint) {
-                            Image(systemName: "arrow.down.circle.fill")
+                    // 🚩 จุดหมาย (จุดเริ่มต้นตอนเข้าป่า)
+                    if let endPoint = viewModel.backtrackPath.last {
+                        Annotation("จุดหมาย", coordinate: endPoint) {
+                            Image(systemName: "flag.checkered.circle.fill")
                                 .font(.title)
-                                .foregroundStyle(.white, .orange)
+                                .foregroundStyle(.white, .green)
+                        }
+                    }
+                    
+                    // 📍 จุดเริ่มย้อนกลับ (จุดสุดท้ายตอนเข้าป่า)
+                    if let startPoint = viewModel.backtrackPath.first {
+                        Annotation("เริ่มย้อนกลับ", coordinate: startPoint) {
+                            Image(systemName: "mappin.circle.fill")
+                                .font(.title)
+                                .foregroundStyle(.white, .red)
                         }
                     }
                 }

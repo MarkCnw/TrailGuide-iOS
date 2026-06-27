@@ -9,10 +9,8 @@ struct TrackingView: View {
     @State private var showHostEndConfirm = false
     @State private var currentTime = Date()
     
-    // สถานะสำหรับปุ่ม SOS แบบกดค้าง
-    @State private var isPressingSOS = false
-    @State private var sosProgress: CGFloat = 0.0
-    @State private var sosTimer: Timer?
+    // สถานะสำหรับปุ่ม SOS
+    @State private var showSOSConfirmation = false
     @State private var showSOSTriggeredAlert = false
 
     var body: some View {
@@ -44,20 +42,21 @@ struct TrackingView: View {
                     List {
                         // 🟢 ดรอปคนแรกทิ้ง (เพราะคนแรกคือตัวเองเสมอ ตามที่เรียงไว้ใน allMembers)
                         let companions = Array(viewModel.allMembers.dropFirst())
-                        Section(header: Text("เพื่อนร่วมทริป (\(companions.count))")) {
+                        Section {
                             ForEach(companions, id: \.self) { peer in
                                 memberTrackingRow(for: peer)
+                            }
+                        } header: {
+                            HStack {
+                                Text("เพื่อนร่วมทริป (\(companions.count))")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                sosSmallButton
                             }
                         }
                     }
                     .listStyle(.insetGrouped)
-                }
-                
-                // 🔴 ปุ่ม SOS Floating (อยู่ล่างกลาง) 🔴
-                VStack {
-                    Spacer()
-                    sosFloatingButton
-                        .padding(.bottom, 24)
                 }
             }
             .navigationTitle("กำลังเดินทาง")
@@ -92,6 +91,14 @@ struct TrackingView: View {
                 Button("ออกจากปาร์ตี้", role: .destructive) { viewModel.leaveRoom(source: "TrackingView - ออกจากปาร์ตี้") }
                 Button("ยกเลิก", role: .cancel) {}
             } message: { Text("หากคุณออก คุณจะไม่ได้รับข้อมูลพิกัดเพื่อนๆ อีก") }
+            .confirmationDialog(
+                "คุณต้องการส่งสัญญาณฉุกเฉิน (SOS) หรือไม่?",
+                isPresented: $showSOSConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("ส่ง SOS ทันที", role: .destructive) { triggerSOS() }
+                Button("ยกเลิก", role: .cancel) {}
+            } message: { Text("เพื่อนร่วมทริปจะได้รับการแจ้งเตือนทันที") }
             .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
                 self.currentTime = Date()
             }
@@ -202,7 +209,7 @@ struct TrackingView: View {
                                 } else {
                                     Circle().fill(isDisconnected ? Color.gray : (isSOSActive ? Color.red : Color.orange)).frame(width: 36, height: 36)
                                         .shadow(radius: 3)
-                                    Text(String(peer.prefix(1)).uppercased())
+                                    Text(String(peer.cleanPeerName.prefix(1)).uppercased())
                                         .font(.caption).fontWeight(.bold).foregroundColor(.white)
                                 }
                                 
@@ -272,7 +279,7 @@ struct TrackingView: View {
                     Circle()
                         .fill(isDisconnected ? Color.gray.opacity(0.15) : (isSOSActive ? Color.red.opacity(0.15) : (isHost ? Color.orange.opacity(0.15) : Color.green.opacity(0.15))))
                         .frame(width: 44, height: 44)
-                    Text(String(peer.prefix(1)).uppercased())
+                    Text(String(peer.cleanPeerName.prefix(1)).uppercased())
                         .fontWeight(.bold)
                         .foregroundColor(isDisconnected ? .gray : (isSOSActive ? .red : (isHost ? .orange : .green)))
                 }
@@ -280,7 +287,7 @@ struct TrackingView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 4) {
-                    Text(peer)
+                    Text(peer.cleanPeerName)
                         .fontWeight(.semibold)
                         .foregroundColor(isDisconnected ? .secondary : (isSOSActive ? .red : .primary))
                     
@@ -334,73 +341,31 @@ struct TrackingView: View {
         .background(isSOSActive ? Color.red.opacity(0.05) : Color.clear)
     }
     
-    // --- Component: ปุ่ม SOS (Long Press) ---
-    private var sosFloatingButton: some View {
-        ZStack {
-            Circle()
-                .fill(Color(.systemBackground).opacity(0.8))
-                .frame(width: 80, height: 80)
-                .shadow(color: .black.opacity(0.1), radius: 10, y: 5)
-            
-            Circle()
-                .trim(from: 0, to: sosProgress)
-                .stroke(Color.red, style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                .frame(width: 76, height: 76)
-            
-            Circle()
-                .fill(isPressingSOS ? Color.red.opacity(0.8) : Color.red)
-                .frame(width: 64, height: 64)
-                .shadow(color: .red.opacity(0.4), radius: 5)
-            
-            Text("SOS")
-                .font(.system(size: 18, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-        }
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in
-                    if !isPressingSOS { startSOSTimer() }
-                }
-                .onEnded { _ in
-                    if sosProgress < 1.0 { cancelSOSTimer() }
-                }
-        )
-    }
-    
-    private func startSOSTimer() {
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
-        
-        isPressingSOS = true
-        sosProgress = 0.0
-        
-        sosTimer?.invalidate()
-        sosTimer = Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { _ in
-            if self.sosProgress >= 1.0 {
-                self.sosTimer?.invalidate()
-                self.triggerSOS()
-            } else {
-                withAnimation(.linear(duration: 0.02)) {
-                    self.sosProgress += (0.02 / 3.0)
-                }
+    // --- Component: ปุ่ม SOS เล็ก (ใน Header) ---
+    private var sosSmallButton: some View {
+        Button(action: {
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+            showSOSConfirmation = true
+        }) {
+            HStack(spacing: 4) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                Text("SOS")
+                    .font(.caption)
+                    .fontWeight(.bold)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color.red)
+            .foregroundColor(.white)
+            .clipShape(Capsule())
+            .shadow(color: .red.opacity(0.3), radius: 3, y: 1)
         }
-    }
-    
-    private func cancelSOSTimer() {
-        isPressingSOS = false
-        sosTimer?.invalidate()
-        sosTimer = nil
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            sosProgress = 0.0
-        }
+        .buttonStyle(.plain) // เพื่อไม่ให้ List พยายาม capture ท่าทาง
     }
     
     private func triggerSOS() {
-        isPressingSOS = false
-        withAnimation { sosProgress = 0.0 }
-        
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.error)
         

@@ -30,12 +30,20 @@ class MultipeerSessionManager: NSObject, ObservableObject {
     private var peerIdMap: [String: MCPeerID] = [:]
     
     init(username: String) {
+        var currentPeerID: MCPeerID?
         if let data = UserDefaults.standard.data(forKey: "saved_peer_id"),
-           let savedPeerID = try? NSKeyedUnarchiver.unarchivedObject(ofClass: MCPeerID.self, from: data),
-           savedPeerID.displayName == username {
-            self.mcPeerId = savedPeerID
+           let savedPeerID = try? NSKeyedUnarchiver.unarchivedObject(ofClass: MCPeerID.self, from: data) {
+            let components = savedPeerID.displayName.components(separatedBy: "-#")
+            if components.first == username {
+                currentPeerID = savedPeerID
+            }
+        }
+        
+        if let validPeer = currentPeerID {
+            self.mcPeerId = validPeer
         } else {
-            let newPeerID = MCPeerID(displayName: username)
+            let uniqueID = UUID().uuidString.prefix(4)
+            let newPeerID = MCPeerID(displayName: String("\(username)-#\(uniqueID)".prefix(63)))
             self.mcPeerId = newPeerID
             if let data = try? NSKeyedArchiver.archivedData(withRootObject: newPeerID, requiringSecureCoding: true) {
                 UserDefaults.standard.set(data, forKey: "saved_peer_id")
@@ -156,7 +164,8 @@ class MultipeerSessionManager: NSObject, ObservableObject {
     // 🟢 ฟังก์ชันอัปเดตชื่อผู้ใช้
     func updateUsername(_ newName: String) {
         disconnect()
-        let newPeerID = MCPeerID(displayName: newName)
+        let uniqueID = UUID().uuidString.prefix(4)
+        let newPeerID = MCPeerID(displayName: String("\(newName)-#\(uniqueID)".prefix(63)))
         self.mcPeerId = newPeerID
         if let data = try? NSKeyedArchiver.archivedData(withRootObject: newPeerID, requiringSecureCoding: true) {
             UserDefaults.standard.set(data, forKey: "saved_peer_id")

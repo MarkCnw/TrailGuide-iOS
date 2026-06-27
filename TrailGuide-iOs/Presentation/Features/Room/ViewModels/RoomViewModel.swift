@@ -224,7 +224,7 @@ class RoomViewModel: ObservableObject {
                 case .sos:
                     let generator = UINotificationFeedbackGenerator(); generator.notificationOccurred(.error)
                     self?.sosIncomingFrom = payload.senderName
-                    self?.latestSOSPeerName = payload.senderName
+                    self?.latestSOSPeerName = payload.senderName.cleanPeerName
                     self?.sosActivePeers.insert(peerName)
                     self?.showSOSReceivedAlert = true
                     

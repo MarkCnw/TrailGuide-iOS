@@ -5,7 +5,7 @@ import CoreLocation
 // ใช้ String เป็น ID แทน MCPeerID และ Data แทน UIImage เพื่อให้ Domain บริสุทธิ์
 struct TrailMember: Identifiable {
     let id: String // ใช้ชื่อ peer name เป็น ID
-    var name: String { id }
+    var name: String { id.cleanPeerName }
     
     var location: CLLocationCoordinate2D?
     var heading: Double?
@@ -16,5 +16,14 @@ struct TrailMember: Identifiable {
     var isSignalLost: Bool {
         guard let lastSeen = lastSeen else { return true }
         return Date().timeIntervalSince(lastSeen) > 30
+    }
+}
+
+extension String {
+    var cleanPeerName: String {
+        if let range = self.range(of: "-#") {
+            return String(self[..<range.lowerBound])
+        }
+        return self
     }
 }

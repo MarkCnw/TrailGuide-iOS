@@ -185,6 +185,11 @@ class LocationRepositoryImpl: LocationRepositoryProtocol {
         locationService.startUpdatingLocation()
     }
     
+    func pauseRecordingRoute() {
+        isRecording = false
+        // ไม่หยุด locationService เพื่อให้ GPS ยังอ่านค่า Location ต่อไป (สำหรับ Backtracking)
+    }
+    
     func stopRecordingRoute() {
         isRecording = false
         locationService.stopUpdatingLocation()

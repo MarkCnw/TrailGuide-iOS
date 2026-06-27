@@ -39,6 +39,7 @@ protocol LocationRepositoryProtocol {
     
     // เริ่ม/หยุด การบันทึกเส้นทาง
     func startRecordingRoute()
+    func pauseRecordingRoute()
     func stopRecordingRoute()
     func clearRoute()
 }

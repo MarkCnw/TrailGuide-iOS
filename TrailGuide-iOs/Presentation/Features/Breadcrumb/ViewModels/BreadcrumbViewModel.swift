@@ -7,16 +7,17 @@ import SwiftUI
 final class BreadcrumbViewModel {
     
     enum BacktrackConstants {
-        static let waypointReachThreshold: CLLocationDistance = 10.0
-        static let offRouteThreshold: CLLocationDistance = 20.0
+        static let waypointReachThreshold: CLLocationDistance = 2.0
+        static let offRouteThreshold: CLLocationDistance = 5.0
         static let minimumBacktrackPoints: Int = 2
-        static let waypointSpacing: CLLocationDistance = 10.0
+        static let waypointSpacing: CLLocationDistance = 1.0
         static let waypointBearingChangeThreshold: Double = 30.0
     }
     
     var isRecording: Bool = false
     var routePath: [CLLocationCoordinate2D] = []
     var rawRoutePath: [CLLocationCoordinate2D] = []
+    var tripStartTime: Date?
     
     private let locationRepository: LocationRepositoryProtocol
     private let saveTripUseCase: SaveTripUseCase
@@ -59,8 +60,7 @@ final class BreadcrumbViewModel {
         locationRepository.startRecordingRoute()
         isRecording = true
         isBacktracking = false
-        
-        
+        tripStartTime = Date()
     }
     
     func stopTracking() {
@@ -73,6 +73,7 @@ final class BreadcrumbViewModel {
         isRecording = false
         isBacktracking = false
         backtrackPath = []
+        tripStartTime = nil
     }
     
     // ==========================================
@@ -87,7 +88,8 @@ final class BreadcrumbViewModel {
     
     func startBacktracking() {
         guard rawRoutePath.count >= BacktrackConstants.minimumBacktrackPoints else { return }
-        stopTracking()
+        locationRepository.pauseRecordingRoute()
+        isRecording = false
         
         let reversedPath = Array(rawRoutePath.reversed())
         
@@ -205,12 +207,21 @@ final class BreadcrumbViewModel {
     }
     
     func saveCurrentTrip() {
+        var totalDistance = 0.0
+        if rawRoutePath.count > 1 {
+            for i in 1..<rawRoutePath.count {
+                totalDistance += LocationCalculator.calculateDistance(from: rawRoutePath[i-1], to: rawRoutePath[i])
+            }
+        }
+        
+        let duration = tripStartTime.map { Date().timeIntervalSince($0) } ?? 0.0
+        
         let newTrip = TripHistory(
             id: Int.random(in: 1...999999),
             name: generateDefaultTripName(),
             date: Date(),
-            distance: 0.0,
-            duration: 0.0,
+            distance: totalDistance,
+            duration: duration,
             routePath: self.rawRoutePath
         )
         saveTripUseCase.execute(newTrip)

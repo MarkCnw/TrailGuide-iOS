@@ -91,7 +91,7 @@ struct ScanView: View {
             }
         }) {
             HStack {
-                Text(peer).font(.headline).foregroundColor(.primary)
+                Text(peer.cleanPeerName).font(.headline).foregroundColor(.primary)
                 Spacer()
                 
                 if joiningPeer == peer {

@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<gpx version="1.1" creator="Xcode">
+    <wpt lat="13.756300" lon="100.501800"><name>Start</name></wpt>
+    <wpt lat="13.756400" lon="100.501800"><name>Walking...</name></wpt>
+    <wpt lat="13.756500" lon="100.501800"><name>Walking...</name></wpt>
+    
+    <wpt lat="13.756500" lon="100.505000"><name>🚨 OFF ROUTE!</name></wpt>
+    <wpt lat="13.756500" lon="100.505500"><name>Still Lost</name></wpt>
+    <wpt lat="13.756500" lon="100.506000"><name>Still Lost</name></wpt>
+</gpx>
